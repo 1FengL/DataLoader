@@ -3,10 +3,9 @@ from parallel import MultiProcessDataset
 
 
 def test_mnist_shape():
-    ds = MNIST(train_or_test='train')
-    dl = MultiProcessDataset(ds, num_worker=2, num_prefetch=2)
+    ds = MNIST(train_or_test='train', path='../data')
     img_shape, label_shape = None, None
-    for img, label in dl:
+    for img, label in ds:
         img_shape = img.shape
         label_shape = label.shape
         break

@@ -53,6 +53,5 @@ class CIFAR10(Dataset):
     def __len__(self):
         return self.images.shape[0]
 
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self.images[i], self.labels[i]
+    def __getitem__(self, index):
+        return self.images[index], self.labels[index]

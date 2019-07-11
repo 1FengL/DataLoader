@@ -3,20 +3,36 @@ import math
 import numpy as np
 
 __all__ = ['DatasetWrapper', 'Transform', '_Transforms_for_tf_dataset',
-           'BatchedDataset', 'ShuffledDataset', 'TransformedDataset',
+           'BatchedDataset', 'TransformedDataset', 'ShuffledDataset',
            'AugmentedDataset']
+
+
+class IndexableDatasetWrapper(object):
+    def __init__(self, ds):
+        self.ds = ds
+        self.ds_len = len(ds)
+
+    def __getitem__(self, index):
+        return self.ds.__getitem__(index)
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __call__(self, *args, **kwargs):
+        return self
 
 
 class DatasetWrapper(object):
     def __init__(self, ds):
         self.ds = ds
+        self.ds_len = len(ds)
 
     def __len__(self):
         return len(self.ds)
 
     def __iter__(self):
-        for data in self.ds:
-            yield data
+        for dp in self.ds:
+            yield dp
 
     def __call__(self, *args, **kwargs):
         return self.__iter__()
@@ -130,28 +146,38 @@ class BatchedDataset(DatasetWrapper):
             raise ValueError("Unsupported type for batching.")
 
 
+# class ShuffledDataset(DatasetWrapper):
+#     def __init__(self, ds, buffer_size):
+#         super(ShuffledDataset, self).__init__(ds)
+#         self.buffer_size = buffer_size
+#
+#     def __iter__(self):
+#         buffer = []
+#         for dp in self.ds:
+#             buffer.append(dp)
+#             if len(buffer) == self.buffer_size:
+#                 shuffled_idxs = np.random.permutation(self.buffer_size)
+#                 for shuffled_idx in shuffled_idxs:
+#                     yield buffer[shuffled_idx]
+#                 del buffer[:]
+#         if len(buffer) > 0:
+#             shuffled_idxs = np.random.permutation(len(buffer))
+#             for shuffled_idx in shuffled_idxs:
+#                 yield buffer[shuffled_idx]
+#             del buffer[:]
+
+
 class ShuffledDataset(DatasetWrapper):
-    def __init__(self, ds, buffer_size):
+    def __init__(self, ds):
         super(ShuffledDataset, self).__init__(ds)
-        self.buffer_size = buffer_size
 
     def __iter__(self):
-        buffer = []
-        for dp in self.ds:
-            buffer.append(dp)
-            if len(buffer) == self.buffer_size:
-                shuffled_idxs = np.random.permutation(self.buffer_size)
-                for shuffled_idx in shuffled_idxs:
-                    yield buffer[shuffled_idx]
-                del buffer[:]
-        if len(buffer) > 0:
-            shuffled_idxs = np.random.permutation(len(buffer))
-            for shuffled_idx in shuffled_idxs:
-                yield buffer[shuffled_idx]
-            del buffer[:]
+        self.shuffled_idxs = np.random.permutation(len(self.ds))
+        for index, data in enumerate(self.ds):
+            yield self.ds[self.shuffled_idxs[index]]
 
 
-class TransformedDataset(DatasetWrapper):
+class TransformedDataset(IndexableDatasetWrapper):
     """
 
     """
@@ -160,37 +186,36 @@ class TransformedDataset(DatasetWrapper):
         super(TransformedDataset, self).__init__(ds)
         self.transforms = transforms
 
-    def __iter__(self):
-        for dp in self.ds:
-            dp = list(dp)
-            for transform in self.transforms:
-                if isinstance(transform, (tuple, list)):
-                    assert callable(transform[0])
-                    dp[transform[1]] = transform[0](dp[transform[1]])
-                else:
-                    assert callable(transform)
-                    dp = transform(*dp)
-            yield tuple(dp)
+    def __getitem__(self, index):
+        dp = self.ds[index]
+        for transform in self.transforms:
+            assert callable(transform)
+            if isinstance(dp, (list, tuple)):
+                dp = transform(*dp)
+            else:
+                dp = transform(dp)
+        return dp
 
 
-class AugmentedDataset(DatasetWrapper):
+class AugmentedDataset(IndexableDatasetWrapper):
     def __init__(self, ds, augmentations):
         super(AugmentedDataset, self).__init__(ds)
         self.augmentations = augmentations
+        self.num_augmentations = len(self.augmentations)
+
+    def __getitem__(self, index):
+        if index >= self.__len__():
+            raise IndexError
+        dp = self.ds[index % self.ds_len]
+        if index < self.ds_len:
+            return dp
+        augmentation = self.augmentations[(index // self.ds_len) - 1]
+        assert callable(augmentation)
+        if isinstance(dp, (list, tuple)):
+            return augmentation(*dp)
+        else:
+            return augmentation(dp)
 
     def __len__(self):
         # every augmentation gives one more duplication of dataset
-        return len(self.ds) * (1 + len(self.augmentations))
-
-    def __iter__(self):
-        for dp in self.ds:
-            yield dp
-            dp = list(dp)
-            for augmentation in self.augmentations:
-                if isinstance(augmentation, (tuple, list)):
-                    assert callable(augmentation[0])
-                    dp[augmentation[1]] = augmentation[0](dp[augmentation[1]])
-                else:
-                    assert callable(augmentation)
-                    dp = augmentation(*dp)
-            yield tuple(dp)
+        return self.ds_len * (1 + self.num_augmentations)
