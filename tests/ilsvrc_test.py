@@ -7,10 +7,9 @@ from dataloader.image import *
 
 def measure_dl_speed(dl):
     net = tf.keras.applications.resnet50.ResNet50(include_top=True,
-                                                  weights=None,
-                                                  classes=10)
+                                                  weights='imagenet',
+                                                  classes=1000)
     weights = net.trainable_weights
-    print(weights)
     optimizer = tf.optimizers.Adam()
     for img, label in dl:
         label = np.expand_dims(label, 1)
@@ -22,18 +21,19 @@ def measure_dl_speed(dl):
         optimizer.apply_gradients(zip(grad, weights))
 
 
-class myTransform(Transform):
-
-    def __call__(self, img, label):
-        return gray2rgb(img), label
+# class myTransform(Transform):
+#
+#     def __call__(self, img, label):
+#         return gray2rgb(img), label
 
 
 if __name__ == '__main__':
-    ds = MNIST(train_or_test='train', path='../data')
+    # ds = MNIST(train_or_test='train', path='../data')
+    ds = ILSVRC12(path='../data', train_or_test='train', meta_dir='../data')
     for img, label in ds:
         print(img.shape)
         break
-    dl = Dataloader(ds, batch_size=500, shuffle=True, num_worker=4, transforms=[myTransform()])
+    dl = Dataloader(ds, batch_size=128, shuffle=True, num_worker=4, transforms=None)
     for img, label in dl:
         print(img.shape, label.shape)
         break
