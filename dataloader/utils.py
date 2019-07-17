@@ -9,7 +9,8 @@ from urllib.request import urlretrieve
 
 
 def exists_or_mkdir(path, verbose=True):
-    """Check a folder by given name, if not exist, create the folder and return False,
+    """
+    Check a folder by given name, if not exist, create the folder and return False,
     if directory exists, return True.
 
     Parameters
@@ -26,7 +27,7 @@ def exists_or_mkdir(path, verbose=True):
 
     Examples
     --------
-    >>> tl.files.exists_or_mkdir("checkpoints/train")
+    >>> exists_or_mkdir("checkpoints/train")
 
     """
     if not os.path.exists(path):
@@ -40,8 +41,49 @@ def exists_or_mkdir(path, verbose=True):
         return True
 
 
+def download(filename, working_directory, url_source):
+    """
+    Download file from url_source to the working_directory with given filename.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the downloaded file.
+    working_directory : str
+        A folder path download the file to
+    url_source : str
+        The URL to download the file from
+
+    Examples
+    --------
+    >>> download(filename='train.gz',
+    ...          working_directory='data/',
+    ...          url_source='http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz')
+
+    """
+    working_directory = os.path.expanduser(working_directory)
+
+    progress_bar = progressbar.ProgressBar()
+
+    def _dlProgress(count, blockSize, totalSize, pbar=progress_bar):
+        if (totalSize != 0):
+
+            if not pbar.max_value:
+                totalBlocks = math.ceil(float(totalSize) / float(blockSize))
+                pbar.max_value = int(totalBlocks)
+
+            pbar.update(count, force=True)
+
+    filepath = os.path.join(working_directory, filename)
+
+    logging.info('Downloading %s...\n' % filename)
+
+    urlretrieve(url_source, filepath, reporthook=_dlProgress)
+
+
 def maybe_download_and_extract(filename, working_directory, url_source, extract=False, expected_bytes=None):
-    """Checks if file exists in working_directory otherwise tries to dowload the file,
+    """
+    Checks if file exists in working_directory otherwise tries to dowload the file,
     and optionally also tries to extract the file if format is ".zip" or ".tar"
 
     Parameters
@@ -50,7 +92,7 @@ def maybe_download_and_extract(filename, working_directory, url_source, extract=
         The name of the (to be) dowloaded file.
     working_directory : str
         A folder path to search for the file in and dowload the file to
-    url : str
+    url_source : str
         The URL to download the file from
     extract : boolean
         If True, tries to uncompress the dowloaded file is ".tar.gz/.tar.bz2" or ".zip" file, default is False.
@@ -64,46 +106,26 @@ def maybe_download_and_extract(filename, working_directory, url_source, extract=
 
     Examples
     --------
-    >>> down_file = tl.files.maybe_download_and_extract(filename='train-images-idx3-ubyte.gz',
+    >>> down_file = maybe_download_and_extract(filename='train.gz',
     ...                                            working_directory='data/',
-    ...                                            url_source='http://yann.lecun.com/exdb/mnist/')
-    >>> tl.files.maybe_download_and_extract(filename='ADEChallengeData2016.zip',
-    ...                                             working_directory='data/',
-    ...                                             url_source='http://sceneparsing.csail.mit.edu/data/',
-    ...                                             extract=True)
+    ...                                            url_source='http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz')
+    >>> maybe_download_and_extract(filename='ADEChallengeData2016.zip',
+    ...                            working_directory='data/',
+    ...                            url_source='http://sceneparsing.csail.mit.edu/data/ADEChallengeData2016.zip',
+    ...                            extract=True)
 
     """
-
-    # We first define a download function, supporting both Python 2 and 3.
-    def _download(filename, working_directory, url_source):
-
-        progress_bar = progressbar.ProgressBar()
-
-        def _dlProgress(count, blockSize, totalSize, pbar=progress_bar):
-            if (totalSize != 0):
-
-                if not pbar.max_value:
-                    totalBlocks = math.ceil(float(totalSize) / float(blockSize))
-                    pbar.max_value = int(totalBlocks)
-
-                pbar.update(count, force=True)
-
-        filepath = os.path.join(working_directory, filename)
-
-        logging.info('Downloading %s...\n' % filename)
-
-        urlretrieve(url_source + filename, filepath, reporthook=_dlProgress)
-
+    working_directory = os.path.expanduser(working_directory)
     exists_or_mkdir(working_directory, verbose=False)
     filepath = os.path.join(working_directory, filename)
 
     if not os.path.exists(filepath):
-        _download(filename, working_directory, url_source)
+        download(filename, working_directory, url_source)
         statinfo = os.stat(filepath)
         logging.info('Succesfully downloaded %s %s bytes.' % (filename, statinfo.st_size))  # , 'bytes.')
-        if (not (expected_bytes is None) and (expected_bytes != statinfo.st_size)):
+        if not (expected_bytes is None) and (expected_bytes != statinfo.st_size):
             raise Exception('Failed to verify ' + filename + '. Can you get to it with a browser?')
-        if (extract):
+        if extract:
             if tarfile.is_tarfile(filepath):
                 logging.info('Trying to extract tar file')
                 tarfile.open(filepath, 'r').extractall(working_directory)

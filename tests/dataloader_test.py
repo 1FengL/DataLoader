@@ -1,7 +1,4 @@
-import sys
-
-from base import *
-from common import *
+from dataloader.base import *
 
 
 class SimpleDataset(Dataset):

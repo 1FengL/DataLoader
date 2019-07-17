@@ -1,5 +1,4 @@
-from dataset.mnist import MNIST
-from parallel import MultiProcessDataset
+from dataloader.dataset.mnist import MNIST
 
 
 def test_mnist_shape():

@@ -1,10 +1,8 @@
 import math
-import time
-import numpy as np
 
-from base import Dataset, Dataloader
-from common import *
-from dataset import MNIST
+from dataloader.base import Dataset
+from dataloader.common import *
+from dataloader.dataset import MNIST
 
 
 class SimpleDataset(Dataset):

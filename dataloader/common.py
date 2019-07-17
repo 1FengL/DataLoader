@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+import tensorflow as tf
 
 __all__ = ['DatasetWrapper', 'Transform', '_Transforms_for_tf_dataset',
            'BatchedDataset', 'TransformedDataset', 'ShuffledDataset',
