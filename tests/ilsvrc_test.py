@@ -56,11 +56,13 @@ class myTransform(Transform):
 
     def __call__(self, img, label):
         img = cv2.resize(img, (RESIZE_HEIGHT, RESIZE_WIDTH))
+        img = np.array(img, dtype=np.float32)
+        img /= 255
         return img, label
 
 
 if __name__ == '__main__':
-    ds = ILSVRC12(path='../data', train_or_test='train', meta_dir='../data')
+    ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test='train', meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12')
     for img, label in ds:
         print(img.shape)
         break
