@@ -32,10 +32,7 @@ def measure_dl_speed(dl, num_steps):
         vms_sum += vms_after - vms_before
         shared_sum += shared_after - shared_before
 
-        label = np.expand_dims(label, 1)
-        label = np.array(label, dtype=np.float32)
-
-        training_start = time.time()
+        training_time_start = time.time()
 
         with tf.GradientTape() as tape:
             logits = net(img)
@@ -44,10 +41,10 @@ def measure_dl_speed(dl, num_steps):
         optimizer.apply_gradients(zip(grad, weights))
 
         training_end = time.time()
-        training_time_sum += training_start - training_end
+        training_time_sum += training_time_start - training_end
 
         print("Loss: ", loss, " | Loading: ", loading_time_end - loading_time_start, " | Training: ",
-              training_end - training_start)
+              training_end - training_time_start)
 
         cnt += 1
         if cnt == num_steps:
@@ -56,7 +53,8 @@ def measure_dl_speed(dl, num_steps):
         loading_time_start = time.time()
 
     print("Average loading: ", loading_time_sum / num_steps, " | Average training: ", training_time_sum / num_steps)
-    print("Average RSS: ", rss_sum / num_steps, " | Average VMS: ", vms_sum / num_steps, " | Average SHR: ", shared_sum / num_steps)
+    print("Average RSS: ", format_bytes(rss_sum / num_steps), " | Average VMS: ", format_bytes(vms_sum / num_steps),
+          " | Average SHR: ", format_bytes(shared_sum / num_steps))
 
 
 class myTransform(Transform):
@@ -71,10 +69,12 @@ class myTransform(Transform):
 if __name__ == '__main__':
     ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test='train',
                   meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12')
-    dl = Dataloader(ds, batch_size=32, shuffle=False, num_worker=4, transforms=[myTransform()])
+    dl = Dataloader(ds, output_types=(np.float32, np.float32), batch_size=32, shuffle=False, num_worker=4,
+                    transforms=[myTransform()])
     print("######  Dataloader  ######")
     measure_dl_speed(dl, num_steps=50)
 
-    dl = TFDataloader(ds, output_types=(tf.float32, tf.float32), shuffle=False, batch_size=32)
+    dl = TFDataloader(ds, output_types=(tf.float32, tf.float32), shuffle=False, batch_size=32,
+                      transforms=[myTransform()])
     print("######  Dataloader  ######")
     measure_dl_speed(dl, num_steps=50)

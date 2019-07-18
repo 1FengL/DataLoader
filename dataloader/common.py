@@ -73,12 +73,14 @@ class BatchedDataset(DatasetWrapper):
                  batch_size,
                  drop_remainder=True,
                  return_numpy=True,
-                 keep_dims=True):
+                 keep_dims=True,
+                 output_types=None):
         super(BatchedDataset, self).__init__(ds)
         self.batch_size = batch_size
         self.drop_remainder = drop_remainder
         self.return_numpy = return_numpy
         self.keep_dims = keep_dims
+        self.output_types = output_types
 
     def __iter__(self):
         dp_buffer = []
@@ -111,7 +113,7 @@ class BatchedDataset(DatasetWrapper):
                 for j in range(len(dp_buffer)):
                     dp_element_batch.append(dp_buffer[j][i])
                 if self.return_numpy:
-                    dp_batch[i] = self._batch_ndarray(dp_element_batch)
+                    dp_batch[i] = self._batch_ndarray(dp_element_batch, dtype=self._get_element_dtype(i))
                 else:
                     dp_batch[i] = dp_element_batch
             return dp_batch
@@ -122,7 +124,7 @@ class BatchedDataset(DatasetWrapper):
                 for j in range(len(dp_buffer)):
                     dp_element_batch.append(dp_buffer[j][key])
                 if self.return_numpy:
-                    dp_batch[key] = self._batch_ndarray(dp_element_batch)
+                    dp_batch[key] = self._batch_ndarray(dp_element_batch, dtype=None)
                 else:
                     dp_batch[key] = dp_element_batch
             return dp_batch
@@ -131,23 +133,35 @@ class BatchedDataset(DatasetWrapper):
         # single elements
         else:
             if self.return_numpy:
-                return self._batch_ndarray(dp_buffer)
+                return self._batch_ndarray(dp_buffer, dtype=self._get_element_dtype(0))
             else:
                 return dp_buffer
 
-    def _batch_ndarray(self, dp_element_batch):
+    def _batch_ndarray(self, dp_element_batch, dtype):
         """
 
         :param dp_element_batch: a list of datapoint element, an element can be np.ndarray / list
         :return: np.ndarray, type is the same as input
         """
         try:
-            ret = np.asarray(dp_element_batch)
+            if dtype is not None:
+                ret = np.asarray(dp_element_batch, dtype=dtype)
+            else:
+                ret = np.asarray(dp_element_batch)
             if self.keep_dims and len(ret.shape) == 1:
                 ret = np.expand_dims(ret, 1)
             return ret
         except:
             raise ValueError("Unsupported type for batching.")
+
+    def _get_element_dtype(self, i):
+        if self.output_types is None:
+            return None
+        if not isinstance(self.output_types, (tuple, list)):
+            return self.output_types
+        if len(self.output_types) == 1:
+            return self.output_types[0]
+        return self.output_types[i]
 
 
 # class ShuffledDataset(DatasetWrapper):

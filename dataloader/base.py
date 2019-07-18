@@ -28,6 +28,7 @@ class Dataloader(DatasetWrapper):
                  shuffle=False,
                  batch_size=1,
                  drop_remainder=True,
+                 output_types=None,
                  num_worker=os.cpu_count(),
                  num_prefetch=None,
                  transforms=None):
@@ -37,6 +38,7 @@ class Dataloader(DatasetWrapper):
         self.shuffle = shuffle
         self.batch_size = batch_size
         self.drop_remainder = drop_remainder
+        self.output_types = output_types
         self.num_worker = num_worker
         self.num_prefetch = num_worker if num_prefetch is None else num_prefetch
         self.transforms = transforms
@@ -55,8 +57,8 @@ class Dataloader(DatasetWrapper):
         elif self.shuffle:
             self.ds = ShuffledDataset(self.ds)
 
-        if self.batch_size > 1:
-            self.ds = BatchedDataset(self.ds, self.batch_size, drop_remainder=self.drop_remainder)
+        self.ds = BatchedDataset(self.ds, self.batch_size, drop_remainder=self.drop_remainder,
+                                 output_types=self.output_types)
 
         # self.tfds = tf.data.Dataset.from_generator(self.ds, output_types=output_types)
 
