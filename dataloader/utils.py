@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import psutil
 import tarfile
 import time
 import zipfile
@@ -150,3 +151,20 @@ def get_dataloader_speed(dl, num_steps):
             end = time.time()
             break
     return (end - start) / num_steps
+
+
+def format_bytes(bytes):
+    if abs(bytes) < 1000:
+        return str(bytes) + "B"
+    elif abs(bytes) < 1e6:
+        return str(round(bytes / 1e3, 2)) + "kB"
+    elif abs(bytes) < 1e9:
+        return str(round(bytes / 1e6, 2)) + "MB"
+    else:
+        return str(round(bytes / 1e9, 2)) + "GB"
+
+
+def get_process_memory():
+    process = psutil.Process(os.getpid())
+    mi = process.memory_info()
+    return mi.rss, mi.vms, mi.shared

@@ -14,7 +14,6 @@ class SimpleDataset(Dataset):
 def test_Dataloader():
     ds = SimpleDataset()
     dl = Dataloader(ds,
-                    output_types=None,
                     augmentations=None,
                     shuffle=False,
                     batch_size=2,

@@ -63,7 +63,7 @@ class _Transforms_for_tf_dataset(object):
         # return data_list
         data_list = list(args)
         for transform in self.transforms:
-            data_list[transform.data_index] = transform(data_list[transform.data_index])
+            data_list = transform(*data_list)
         return data_list
 
 
@@ -72,21 +72,23 @@ class BatchedDataset(DatasetWrapper):
                  ds,
                  batch_size,
                  drop_remainder=True,
-                 return_numpy=True):
+                 return_numpy=True,
+                 keep_dims=True):
         super(BatchedDataset, self).__init__(ds)
         self.batch_size = batch_size
         self.drop_remainder = drop_remainder
         self.return_numpy = return_numpy
+        self.keep_dims = keep_dims
 
     def __iter__(self):
         dp_buffer = []
         for dp in self.ds:
             dp_buffer.append(dp)
             if len(dp_buffer) == self.batch_size:
-                yield BatchedDataset._batch_datapoints(dp_buffer, self.return_numpy)
+                yield self._batch_datapoints(dp_buffer)
                 del dp_buffer[:]
         if not self.drop_remainder:
-            yield BatchedDataset._batch_datapoints(dp_buffer, self.return_numpy)
+            yield self._batch_datapoints(dp_buffer)
 
     def __len__(self):
         ds_len = len(self.ds)
@@ -95,8 +97,7 @@ class BatchedDataset(DatasetWrapper):
         else:
             return math.ceil(ds_len / self.batch_size)
 
-    @staticmethod
-    def _batch_datapoints(dp_buffer, return_numpy=True):
+    def _batch_datapoints(self, dp_buffer):
         """
 
         :param dp_buffer: a list of datapoints
@@ -109,8 +110,8 @@ class BatchedDataset(DatasetWrapper):
                 dp_element_batch = []
                 for j in range(len(dp_buffer)):
                     dp_element_batch.append(dp_buffer[j][i])
-                if return_numpy:
-                    dp_batch[i] = BatchedDataset._batch_ndarray(dp_element_batch)
+                if self.return_numpy:
+                    dp_batch[i] = self._batch_ndarray(dp_element_batch)
                 else:
                     dp_batch[i] = dp_element_batch
             return dp_batch
@@ -120,29 +121,31 @@ class BatchedDataset(DatasetWrapper):
                 dp_element_batch = []
                 for j in range(len(dp_buffer)):
                     dp_element_batch.append(dp_buffer[j][key])
-                if return_numpy:
-                    dp_batch[key] = BatchedDataset._batch_ndarray(dp_element_batch)
+                if self.return_numpy:
+                    dp_batch[key] = self._batch_ndarray(dp_element_batch)
                 else:
                     dp_batch[key] = dp_element_batch
             return dp_batch
         elif isinstance(first_dp, np.ndarray):
-            return BatchedDataset._batch_ndarray(dp_buffer)
+            return self._batch_ndarray(dp_buffer)
         # single elements
         else:
-            if return_numpy:
-                return BatchedDataset._batch_ndarray(dp_buffer)
+            if self.return_numpy:
+                return self._batch_ndarray(dp_buffer)
             else:
                 return dp_buffer
 
-    @staticmethod
-    def _batch_ndarray(dp_element_batch):
+    def _batch_ndarray(self, dp_element_batch):
         """
 
         :param dp_element_batch: a list of datapoint element, an element can be np.ndarray / list
         :return: np.ndarray, type is the same as input
         """
         try:
-            return np.asarray(dp_element_batch)
+            ret = np.asarray(dp_element_batch)
+            if self.keep_dims and len(ret.shape) == 1:
+                ret = np.expand_dims(ret, 1)
+            return ret
         except:
             raise ValueError("Unsupported type for batching.")
 
