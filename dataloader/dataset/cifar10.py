@@ -7,10 +7,11 @@ import numpy as np
 from dataloader.base import Dataset
 from dataloader.utils import maybe_download_and_extract
 
+CIFAR10_URL = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+
 
 class CIFAR10(Dataset):
-    def __init__(self, train_or_test, path='data', name='cifar10', url='https://www.cs.toronto.edu/~kriz/'):
-        self.url = url
+    def __init__(self, train_or_test, path='data', name='cifar10'):
         self.path = os.path.join(path, name)
 
         # Helper function to unpickle the data
@@ -29,7 +30,7 @@ class CIFAR10(Dataset):
         logging.info("Load or Download {0} > {1}".format(name.upper(), self.path))
 
         filename = 'cifar-10-python.tar.gz'
-        maybe_download_and_extract(filename, path, url, extract=True)
+        maybe_download_and_extract(filename, path, CIFAR10_URL, extract=True)
 
         assert train_or_test in ['train', 'test']
         if train_or_test == 'train':

@@ -13,7 +13,7 @@ RESIZE_WIDTH = 256
 
 
 def measure_dl_speed(dl, num_steps):
-    net = tf.keras.applications.resnet50.ResNet50(include_top=True,
+    net = tf.keras.applications.resnet50.ResNet50(include_top=False,
                                                   weights='imagenet',
                                                   classes=1000)
     weights = net.trainable_weights
@@ -40,11 +40,11 @@ def measure_dl_speed(dl, num_steps):
         grad = tape.gradient(loss, weights)
         optimizer.apply_gradients(zip(grad, weights))
 
-        training_end = time.time()
-        training_time_sum += training_time_start - training_end
+        training_time_end = time.time()
+        training_time_sum += training_time_end - training_time_start
 
         print("Loss: ", loss, " | Loading: ", loading_time_end - loading_time_start, " | Training: ",
-              training_end - training_time_start)
+              training_time_end - training_time_start)
 
         cnt += 1
         if cnt == num_steps:
@@ -72,9 +72,9 @@ if __name__ == '__main__':
     dl = Dataloader(ds, output_types=(np.float32, np.float32), batch_size=32, shuffle=False, num_worker=4,
                     transforms=[myTransform()])
     print("######  Dataloader  ######")
-    measure_dl_speed(dl, num_steps=50)
+    measure_dl_speed(dl, num_steps=10)
 
     dl = TFDataloader(ds, output_types=(tf.float32, tf.float32), shuffle=False, batch_size=32,
                       transforms=[myTransform()])
     print("######  Dataloader  ######")
-    measure_dl_speed(dl, num_steps=50)
+    measure_dl_speed(dl, num_steps=10)
