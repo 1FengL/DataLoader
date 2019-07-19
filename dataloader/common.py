@@ -73,7 +73,7 @@ class BatchedDataset(DatasetWrapper):
                  batch_size,
                  drop_remainder=True,
                  return_numpy=True,
-                 keep_dims=True,
+                 keep_dims=False,
                  output_types=None):
         super(BatchedDataset, self).__init__(ds)
         self.batch_size = batch_size

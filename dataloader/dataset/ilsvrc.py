@@ -184,7 +184,7 @@ class ILSVRC12(ILSVRC12Files):
     Produces uint8 ILSVRC12 images of shape [h, w, 3(BGR)], and a label between [0, 999].
     """
     def __init__(self, path, train_or_test, meta_dir,
-                 dir_structure=None):
+                 dir_structure=None, shape=None):
         """
         Args:
             dir (str): A directory containing a subdir named ``name``,
@@ -249,6 +249,7 @@ class ILSVRC12(ILSVRC12Files):
         """
         super(ILSVRC12, self).__init__(
             path, train_or_test, meta_dir, dir_structure)
+        self.shape = shape
 
     """
     There are some CMYK / png images, but cv2 seems robust to them.
@@ -263,6 +264,8 @@ class ILSVRC12(ILSVRC12Files):
     def __getitem__(self, index):
         fname, label = super(ILSVRC12, self).__getitem__(index)
         img = cv2.imread(fname, cv2.IMREAD_COLOR)
+        if self.shape is not None:
+            img = cv2.resize(img, self.shape)
         return img, label
 
     # @staticmethod

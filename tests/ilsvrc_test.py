@@ -13,7 +13,7 @@ RESIZE_WIDTH = 256
 
 
 def measure_dl_speed(dl, num_steps):
-    net = tf.keras.applications.resnet50.ResNet50(include_top=False,
+    net = tf.keras.applications.resnet50.ResNet50(include_top=True,
                                                   weights='imagenet',
                                                   classes=1000)
     weights = net.trainable_weights
@@ -36,7 +36,7 @@ def measure_dl_speed(dl, num_steps):
 
         with tf.GradientTape() as tape:
             logits = net(img)
-            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, logits))
+            loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=logits))
         grad = tape.gradient(loss, weights)
         optimizer.apply_gradients(zip(grad, weights))
 
@@ -60,16 +60,14 @@ def measure_dl_speed(dl, num_steps):
 class myTransform(Transform):
 
     def __call__(self, img, label):
-        img = cv2.resize(img, (RESIZE_HEIGHT, RESIZE_WIDTH))
-        img = np.array(img, dtype=np.float32)
         img /= 255
         return img, label
 
 
 if __name__ == '__main__':
     ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test='train',
-                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12')
-    dl = Dataloader(ds, output_types=(np.float32, np.float32), batch_size=32, shuffle=False, num_worker=4,
+                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
+    dl = Dataloader(ds, output_types=(np.float32, np.int32), batch_size=32, shuffle=False, num_worker=4,
                     transforms=[myTransform()])
     print("######  Dataloader  ######")
     measure_dl_speed(dl, num_steps=10)
