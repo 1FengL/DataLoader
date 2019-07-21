@@ -171,7 +171,7 @@ def format_bytes(bytes):
 def get_process_memory():
     process = psutil.Process(os.getpid())
     mi = process.memory_info()
-    return mi.rss, mi.vms, mi.vms
+    return mi.rss, mi.vms, mi.shared
 
 
 def ensure_proc_terminate(proc):

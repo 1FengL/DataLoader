@@ -85,26 +85,41 @@ class BatchedDataset(DatasetWrapper):
         self.keep_dims = keep_dims
         self.output_types = output_types
 
-        self.q = multiprocessing.Queue(maxsize=1)
-        self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
-                                              args=(self.ds, self.q))
-        self.worker.start()
-        ensure_proc_terminate(self.worker)
+        # self.q = multiprocessing.Queue(maxsize=1)
+        # self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
+        #                                       args=(self.ds, self.q))
+        # self.worker.start()
+        # ensure_proc_terminate(self.worker)
 
-    def _BatchedDataset_worker(self, ds, q):
+        pipe_output, pipe_input = multiprocessing.Pipe()
+        self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
+                                              args=(self.ds, (pipe_output, pipe_input)))
+        self.worker.start()
+        # main process only reads (gets output)
+        pipe_input.close()
+        ensure_proc_terminate(self.worker)
+        self.pipe_output = pipe_output
+
+    def _BatchedDataset_worker(self, ds, pipe):
+        pipe_output, pipe_input = pipe
+        # worker process only writes (puts input)
+        pipe_output.close()
         while True:
             dp_buffer = []
             for dp in ds:
                 dp_buffer.append(dp)
                 if len(dp_buffer) == self.batch_size:
-                    q.put(self._batch_datapoints(dp_buffer))
+                    # q.put(self._batch_datapoints(dp_buffer))
+                    pipe_input.send(self._batch_datapoints(dp_buffer))
                     del dp_buffer[:]
             if not self.drop_remainder:
-                q.put(self._batch_datapoints(dp_buffer))
+                # q.put(self._batch_datapoints(dp_buffer))
+                pipe_input.send(self._batch_datapoints(dp_buffer))
 
     def __iter__(self):
         for _ in range(self.__len__()):
-            yield self.q.get()
+            # yield self.q.get()
+            yield self.pipe_output.recv()
 
     def __len__(self):
         ds_len = len(self.ds)
