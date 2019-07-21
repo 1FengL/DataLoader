@@ -1,6 +1,10 @@
+import atexit
 import logging
 import math
+import multiprocessing
 import os
+import weakref
+
 import psutil
 import tarfile
 import time
@@ -167,4 +171,29 @@ def format_bytes(bytes):
 def get_process_memory():
     process = psutil.Process(os.getpid())
     mi = process.memory_info()
-    return mi.rss, mi.vms, mi.shared
+    return mi.rss, mi.vms, mi.vms
+
+
+def ensure_proc_terminate(proc):
+    """
+    Make sure processes terminate when main process exit.
+
+    Args:
+        proc (multiprocessing.Process or list)
+    """
+    if isinstance(proc, list):
+        for p in proc:
+            ensure_proc_terminate(p)
+        return
+
+    def stop_proc_by_weak_ref(ref):
+        proc = ref()
+        if proc is None:
+            return
+        if not proc.is_alive():
+            return
+        proc.terminate()
+        proc.join()
+
+    assert isinstance(proc, multiprocessing.Process)
+    atexit.register(stop_proc_by_weak_ref, weakref.ref(proc))

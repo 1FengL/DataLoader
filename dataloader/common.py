@@ -4,6 +4,8 @@ import multiprocessing
 import numpy as np
 import tensorflow as tf
 
+from dataloader.utils import ensure_proc_terminate
+
 __all__ = ['DatasetWrapper', 'Transform', '_Transforms_for_tf_dataset',
            'BatchedDataset', 'TransformedDataset', 'ShuffledDataset',
            'AugmentedDataset']
@@ -86,8 +88,8 @@ class BatchedDataset(DatasetWrapper):
         self.q = multiprocessing.Queue(maxsize=1)
         self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
                                               args=(self.ds, self.q))
-        self.worker.daemon = True
         self.worker.start()
+        ensure_proc_terminate(self.worker)
 
     def _BatchedDataset_worker(self, ds, q):
         while True:
