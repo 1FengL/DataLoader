@@ -72,7 +72,7 @@ if __name__ == '__main__':
     print("######  Dataloader  ######")
     measure_dl_speed(dl, num_steps=10)
 
-    dl = TFDataloader(ds, output_types=(tf.float32, tf.float32), shuffle=False, batch_size=32,
+    dl = TFDataloader(ds, output_types=(tf.float32, tf.int32), shuffle=False, batch_size=32,
                       transforms=[myTransform()])
     print("######  Dataloader  ######")
     measure_dl_speed(dl, num_steps=10)

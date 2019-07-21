@@ -1,4 +1,5 @@
 import math
+import multiprocessing
 
 import numpy as np
 import tensorflow as tf
@@ -82,15 +83,26 @@ class BatchedDataset(DatasetWrapper):
         self.keep_dims = keep_dims
         self.output_types = output_types
 
+        self.q = multiprocessing.Queue(maxsize=1)
+        self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
+                                              args=(self.ds, self.q))
+        self.worker.daemon = True
+        self.worker.start()
+
+    def _BatchedDataset_worker(self, ds, q):
+        while True:
+            dp_buffer = []
+            for dp in ds:
+                dp_buffer.append(dp)
+                if len(dp_buffer) == self.batch_size:
+                    q.put(self._batch_datapoints(dp_buffer))
+                    del dp_buffer[:]
+            if not self.drop_remainder:
+                q.put(self._batch_datapoints(dp_buffer))
+
     def __iter__(self):
-        dp_buffer = []
-        for dp in self.ds:
-            dp_buffer.append(dp)
-            if len(dp_buffer) == self.batch_size:
-                yield self._batch_datapoints(dp_buffer)
-                del dp_buffer[:]
-        if not self.drop_remainder:
-            yield self._batch_datapoints(dp_buffer)
+        for _ in range(self.__len__()):
+            yield self.q.get()
 
     def __len__(self):
         ds_len = len(self.ds)
