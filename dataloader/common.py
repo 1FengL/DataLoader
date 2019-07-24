@@ -1,3 +1,4 @@
+import atexit
 import math
 import multiprocessing
 import os
@@ -297,10 +298,27 @@ class Dataloader(DatasetWrapper):
 
         # if self.num_prefetch > 1:
         #     self.tfds = self.tfds.prefetch(num_prefetch)
+        atexit.register(self._clean_up_socket_files)
 
     def __iter__(self):
         for dp in self.ds:
             yield dp
+
+    def _clean_up_socket_files(self):
+        # remove all ipc socket files
+        # the environment variable starts with 'ipc://', so file name starts from 6
+        try:
+            os.remove(os.environ['put_idx'][6:])
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove(os.environ['collect_data'][6:])
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove(os.environ['batch_prefetch'][6:])
+        except FileNotFoundError:
+            pass
 
 
 class TFDataloader(DatasetWrapper):

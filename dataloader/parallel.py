@@ -103,8 +103,6 @@ class ZMQMultiprocessDataset(DatasetWrapper):
         self.shuffle = shuffle
         self._hwm = hwm
 
-        self.context = zmq.Context()
-
         self.idx_pipename = _get_pipe_name('put_idx')
         self.data_pipename = _get_pipe_name('collect_data')
 
@@ -121,24 +119,25 @@ class ZMQMultiprocessDataset(DatasetWrapper):
 
     def _worker(self, bind=False):
         context = zmq.Context()
-        worker_index_receiver = context.socket(zmq.PULL)
-        worker_index_receiver.set_hwm(self._hwm)
+        worker_receive_index_socket = context.socket(zmq.PULL)
+        worker_receive_index_socket.set_hwm(self._hwm)
         if bind:
-            worker_index_receiver.bind(self.idx_pipename)
+            worker_receive_index_socket.bind(self.idx_pipename)
         else:
-            worker_index_receiver.connect(self.idx_pipename)
+            worker_receive_index_socket.connect(self.idx_pipename)
 
-        worker_data_sender = context.socket(zmq.PUSH)
-        worker_data_sender.set_hwm(self._hwm)
+        worker_send_data_socket = context.socket(zmq.PUSH)
+        worker_send_data_socket.set_hwm(self._hwm)
         if bind:
-            worker_data_sender.bind(self.data_pipename)
+            worker_send_data_socket.bind(self.data_pipename)
         else:
-            worker_data_sender.connect(self.data_pipename)
+            worker_send_data_socket.connect(self.data_pipename)
+
         while True:
-            recv_msg = worker_index_receiver.recv(copy=False)
+            recv_msg = worker_receive_index_socket.recv(copy=False)
             idx = load_from_bytes(recv_msg)
             send_msg = convert_to_bytes({'idx': idx, 'data': self.ds[idx]})
-            worker_data_sender.send(send_msg, copy=False)
+            worker_send_data_socket.send(send_msg, copy=False)
 
     def _put_idxs(self):
         context = zmq.Context()
@@ -157,9 +156,10 @@ class ZMQMultiprocessDataset(DatasetWrapper):
         # while not self.data_queue.empty():
         #     self.data_queue.get()
 
-        self.collect_data_socket = self.context.socket(zmq.PULL)
-        self.collect_data_socket.set_hwm(self._hwm)
-        self.collect_data_socket.connect(self.data_pipename)
+        context = zmq.Context()
+        collect_data_socket = context.socket(zmq.PULL)
+        collect_data_socket.set_hwm(self._hwm)
+        collect_data_socket.connect(self.data_pipename)
 
         # shuffle at the start of every epoch
         if self.shuffle:
@@ -188,11 +188,6 @@ class ZMQMultiprocessDataset(DatasetWrapper):
                         data_buffer[idx] = dp
         _shutdown_proc(self.put_idx_worker)
 
-    # def __del__(self):
-    #     _shutdown_proc(self.put_idx_worker)
-    #     os.remove(self.idx_pipename)
-    #     os.remove(self.data_pipename)
-
 
 def _get_pipe_name(name):
     if sys.platform.startswith('linux'):
@@ -204,6 +199,8 @@ def _get_pipe_name(name):
         filename = '{}/{}-pipe-{}'.format(pipedir.rstrip('/'), name, str(uuid.uuid1())[:6])
         assert not os.path.exists(filename), "Pipe {} exists! You may be unlucky.".format(filename)
         pipename = "ipc://{}".format(filename)
+    # register in environment variable, used for cleaning up ipc socket files
+    os.environ[name] = pipename
     return pipename
 
 # class MultiProcessDataset(DatasetWrapper):
