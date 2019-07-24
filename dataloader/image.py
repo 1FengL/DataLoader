@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from dataloader.common import Transform
+from dataloader.base import Transform
 
 
 class Flip(Transform):

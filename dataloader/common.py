@@ -1,73 +1,19 @@
 import math
 import multiprocessing
+import os
+
+import tensorflow as tf
+import zmq
 
 import numpy as np
-import tensorflow as tf
 
+from dataloader.base import IndexableDatasetWrapper, DatasetWrapper, _Transforms_for_tf_dataset
+from dataloader.parallel import _get_pipe_name, ZMQMultiprocessDataset, MultiprocessDataset
 from dataloader.utils import ensure_proc_terminate
+from dataloader.serialize import convert_to_bytes, load_from_bytes
 
-__all__ = ['DatasetWrapper', 'Transform', '_Transforms_for_tf_dataset',
-           'BatchedDataset', 'TransformedDataset', 'ShuffledDataset',
+__all__ = ['BatchedDataset', 'TransformedDataset', 'ShuffledDataset',
            'AugmentedDataset']
-
-
-class IndexableDatasetWrapper(object):
-    def __init__(self, ds):
-        self.ds = ds
-        self.ds_len = len(ds)
-
-    def __getitem__(self, index):
-        return self.ds.__getitem__(index)
-
-    def __len__(self):
-        return len(self.ds)
-
-    def __call__(self, *args, **kwargs):
-        return self
-
-
-class DatasetWrapper(object):
-    def __init__(self, ds):
-        self.ds = ds
-        self.ds_len = len(ds)
-
-    def __len__(self):
-        return len(self.ds)
-
-    def __iter__(self):
-        for dp in self.ds:
-            yield dp
-
-    def __call__(self, *args, **kwargs):
-        return self.__iter__()
-
-
-class Transform(object):
-    def __call__(self, *args, **kwargs):
-        raise NotImplementedError("Transform must implement __call__() method.")
-
-
-class _Transforms_for_tf_dataset(object):
-    """
-    This class aggregate Transforms into one object in order to use tf.data.Dataset.map API
-    """
-
-    def __init__(self, transforms):
-        self.transforms = transforms
-
-    def __call__(self, *args):
-        # assert len(args) == len(self.transforms)
-        # data_list = [None] * len(args)
-        # for i in range(len(args)):
-        #     data = args[i]
-        #     for transform in self.transforms[i]:
-        #         data = transform(data)
-        #     data_list[i] = data
-        # return data_list
-        data_list = list(args)
-        for transform in self.transforms:
-            data_list = transform(*data_list)
-        return data_list
 
 
 class BatchedDataset(DatasetWrapper):
@@ -77,13 +23,15 @@ class BatchedDataset(DatasetWrapper):
                  drop_remainder=True,
                  return_numpy=True,
                  keep_dims=False,
-                 output_types=None):
+                 output_types=None,
+                 use_zmq=True):
         super(BatchedDataset, self).__init__(ds)
         self.batch_size = batch_size
         self.drop_remainder = drop_remainder
         self.return_numpy = return_numpy
         self.keep_dims = keep_dims
         self.output_types = output_types
+        self.use_zmq = use_zmq
 
         # self.q = multiprocessing.Queue(maxsize=1)
         # self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
@@ -91,14 +39,40 @@ class BatchedDataset(DatasetWrapper):
         # self.worker.start()
         # ensure_proc_terminate(self.worker)
 
-        pipe_output, pipe_input = multiprocessing.Pipe()
-        self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
-                                              args=(self.ds, (pipe_output, pipe_input)))
-        self.worker.start()
-        # main process only reads (gets output)
-        pipe_input.close()
+        if self.use_zmq:
+            self.data_pipename = _get_pipe_name('batch_prefetch')
+            context = zmq.Context()
+            self.fetch_data_socket = context.socket(zmq.PULL)
+            self.fetch_data_socket.bind(self.data_pipename)
+            self.worker = multiprocessing.Process(target=self._ZMQ_BatchedDataset_worker,
+                                                  args=(self.ds,))
+            self.worker.start()
+        else:
+            pipe_output, pipe_input = multiprocessing.Pipe()
+            self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
+                                                  args=(self.ds, (pipe_output, pipe_input)))
+            self.worker.start()
+            # main process only reads (gets output)
+            pipe_input.close()
+            self.pipe_output = pipe_output
+
         ensure_proc_terminate(self.worker)
-        self.pipe_output = pipe_output
+
+    def _ZMQ_BatchedDataset_worker(self, ds):
+        context = zmq.Context()
+        prepare_data_socket = context.socket(zmq.PUSH)
+        prepare_data_socket.connect(self.data_pipename)
+        while True:
+            dp_buffer = []
+            for dp in ds:
+                dp_buffer.append(dp)
+                if len(dp_buffer) == self.batch_size:
+                    # q.put(self._batch_datapoints(dp_buffer))
+                    prepare_data_socket.send(convert_to_bytes(self._batch_datapoints(dp_buffer)), copy=False)
+                    del dp_buffer[:]
+            if not self.drop_remainder:
+                # q.put(self._batch_datapoints(dp_buffer))
+                prepare_data_socket.send(convert_to_bytes(self._batch_datapoints(dp_buffer)), copy=False)
 
     def _BatchedDataset_worker(self, ds, pipe):
         pipe_output, pipe_input = pipe
@@ -119,7 +93,10 @@ class BatchedDataset(DatasetWrapper):
     def __iter__(self):
         for _ in range(self.__len__()):
             # yield self.q.get()
-            yield self.pipe_output.recv()
+            if self.use_zmq:
+                yield load_from_bytes(self.fetch_data_socket.recv(copy=False))
+            else:
+                yield self.pipe_output.recv()
 
     def __len__(self):
         ds_len = len(self.ds)
@@ -266,3 +243,112 @@ class AugmentedDataset(IndexableDatasetWrapper):
     def __len__(self):
         # every augmentation gives one more duplication of dataset
         return self.ds_len * (1 + self.num_augmentations)
+
+
+class Dataloader(DatasetWrapper):
+    def __init__(self,
+                 ds,
+                 augmentations=None,
+                 shuffle=False,
+                 batch_size=1,
+                 drop_remainder=True,
+                 batch_keep_dims=False,
+                 output_types=None,
+                 num_worker=os.cpu_count(),
+                 use_zmq=True,
+                 num_prefetch=None,
+                 transforms=None):
+
+        super(Dataloader, self).__init__(ds)
+        self.augmentations = augmentations
+        self.shuffle = shuffle
+        self.batch_size = batch_size
+        self.drop_remainder = drop_remainder
+        self.batch_keep_dims = batch_keep_dims
+        self.output_types = output_types
+        self.num_worker = num_worker
+        self.use_zmq = use_zmq
+        self.num_prefetch = num_worker if num_prefetch is None else num_prefetch
+        self.transforms = transforms
+
+        if self.augmentations is not None:
+            self.ds = AugmentedDataset(self.ds, self.augmentations)
+
+        if self.transforms is not None:
+            self.ds = TransformedDataset(self.ds, self.transforms)
+            # self.tfds = self.tfds.map(map_func=_Transforms(self.transforms), num_parallel_calls=num_map_worker)
+
+        # TODO: auto adjust num_prefetch
+        if self.num_worker > 1:
+            if self.use_zmq:
+                self.ds = ZMQMultiprocessDataset(self.ds, num_worker=self.num_worker, hwm=self.num_prefetch,
+                                                 shuffle=self.shuffle)
+            else:
+                self.ds = MultiprocessDataset(self.ds, num_worker=self.num_worker, num_prefetch=self.num_prefetch,
+                                              shuffle=self.shuffle)
+        elif self.shuffle:
+            self.ds = ShuffledDataset(self.ds)
+
+        self.ds = BatchedDataset(self.ds, self.batch_size, drop_remainder=self.drop_remainder,
+                                 output_types=self.output_types, keep_dims=self.batch_keep_dims,
+                                 use_zmq=self.use_zmq)
+
+        # self.tfds = tf.data.Dataset.from_generator(self.ds, output_types=output_types)
+
+        # if self.num_prefetch > 1:
+        #     self.tfds = self.tfds.prefetch(num_prefetch)
+
+    def __iter__(self):
+        for dp in self.ds:
+            yield dp
+
+
+class TFDataloader(DatasetWrapper):
+    def __init__(self,
+                 ds,
+                 output_types,
+                 augmentations=None,
+                 shuffle=False,
+                 shuffle_buffer_size=None,
+                 batch_size=1,
+                 drop_remainder=True,
+                 # num_extract_worker=os.cpu_count(),
+                 # num_map_worker=os.cpu_count(),
+                 # num_prefetch=None,
+                 transforms=None):
+
+        super(TFDataloader, self).__init__(ds)
+        self.augmentations = augmentations
+        self.shuffle = shuffle
+        self.batch_size = batch_size
+        self.shuffle_buffer_size = 2 * batch_size if shuffle_buffer_size is None else shuffle_buffer_size
+        self.drop_remainder = drop_remainder
+        # self.num_map_worker = num_map_worker
+        # self.num_extract_worker = num_extract_worker
+        # self.num_prefetch = num_extract_worker if num_prefetch is None else num_prefetch
+        self.transforms = transforms
+
+        self.ds = tf.data.Dataset.from_generator(self.ds, output_types=output_types)
+
+        # if self.augmentations is not None:
+        #     self.ds = AugmentedDataset(self.ds, self.augmentations)
+
+        # if self.num_extract_worker > 1:
+        #     self.ds = MultiProcessDataset(self.ds, num_worker=self.num_extract_worker, num_prefetch=self.num_prefetch)
+
+        if self.shuffle:
+            self.ds = self.ds.shuffle(buffer_size=self.shuffle_buffer_size)
+
+        if self.transforms is not None:
+            self.ds = self.ds.map(map_func=_Transforms_for_tf_dataset(self.transforms),
+                                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+        if self.batch_size > 1:
+            self.ds = self.ds.batch(batch_size=self.batch_size, drop_remainder=self.drop_remainder)
+
+        # if self.num_prefetch > 1:
+        self.ds = self.ds.prefetch(tf.data.experimental.AUTOTUNE)
+
+    def __iter__(self):
+        for dp in self.ds:
+            yield dp

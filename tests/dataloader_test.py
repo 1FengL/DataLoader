@@ -1,4 +1,5 @@
 from dataloader.base import *
+from dataloader.common import Dataloader
 
 
 class SimpleDataset(Dataset):

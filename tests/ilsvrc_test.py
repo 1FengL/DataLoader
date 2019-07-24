@@ -1,10 +1,5 @@
-import time
-
-import tensorflow as tf
-import cv2
-
+from dataloader.common import Dataloader, TFDataloader
 from dataloader.dataset import *
-from dataloader.base import *
 from dataloader.image import *
 from dataloader.utils import *
 
