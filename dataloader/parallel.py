@@ -108,6 +108,7 @@ class ZMQMultiprocessDataset(DatasetWrapper):
 
         self.put_idx_worker = None
         for i in range(num_worker):
+            # first worker bind the socket, others connect to the socket
             if i == 0:
                 worker = multiprocessing.Process(target=self._worker,
                                                  args=(True,))
@@ -178,7 +179,7 @@ class ZMQMultiprocessDataset(DatasetWrapper):
                 yield data_buffer.pop(return_idx)
             else:
                 while True:
-                    recv_msg = self.collect_data_socket.recv(copy=False)
+                    recv_msg = collect_data_socket.recv(copy=False)
                     recv_msg = load_from_bytes(recv_msg)
                     idx, dp = recv_msg['idx'], recv_msg['data']
                     if idx == return_idx:
