@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 from dataloader.common import Dataloader, TFDataloader
 from dataloader.dataset import *
 from dataloader.image import *
@@ -54,7 +56,12 @@ def measure_dl_speed(dl, num_steps):
 
 class myTransform(Transform):
 
+    def __init__(self, is_tf=True):
+        self.is_tf = is_tf
+
     def __call__(self, img, label):
+        if not self.is_tf:
+            img = np.array(img, dtype=np.float32)
         img /= 255
         return img, label
 
@@ -62,6 +69,9 @@ class myTransform(Transform):
 if __name__ == '__main__':
     ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test='train',
                   meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
+    for img, label in ds:
+        print(img.shape, label)
+        exit(1)
     dl = Dataloader(ds, output_types=(np.float32, np.int32), batch_size=32, shuffle=False, num_worker=4,
                     transforms=[myTransform()])
     print("######  Dataloader  ######")

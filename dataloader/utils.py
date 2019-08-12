@@ -3,6 +3,8 @@ import logging
 import math
 import multiprocessing
 import os
+import re
+import shutil
 import weakref
 
 import psutil
@@ -11,6 +13,18 @@ import time
 import zipfile
 import progressbar
 from urllib.request import urlretrieve
+
+
+def load_folder_list(path=""):
+    """Return a folder list in a folder by given a folder path.
+
+    Parameters
+    ----------
+    path : str
+        A folder path.
+
+    """
+    return [os.path.join(path, o) for o in os.listdir(path) if os.path.isdir(os.path.join(path, o))]
 
 
 def exists_or_mkdir(path, verbose=True):
@@ -145,6 +159,32 @@ def maybe_download_and_extract(filename, working_directory, url_source, extract=
     return filepath
 
 
+def natural_keys(text):
+    """Sort list of string with number in human order.
+
+    Examples
+    ----------
+    >>> l = ['im1.jpg', 'im31.jpg', 'im11.jpg', 'im21.jpg', 'im03.jpg', 'im05.jpg']
+    >>> l.sort(key=tl.files.natural_keys)
+    ['im1.jpg', 'im03.jpg', 'im05', 'im11.jpg', 'im21.jpg', 'im31.jpg']
+    >>> l.sort() # that is what we dont want
+    ['im03.jpg', 'im05', 'im1.jpg', 'im11.jpg', 'im21.jpg', 'im31.jpg']
+
+    References
+    ----------
+    - `link <http://nedbatchelder.com/blog/200712/human_sorting.html>`__
+
+    """
+
+    # - alist.sort(key=natural_keys) sorts in human order
+    # http://nedbatchelder.com/blog/200712/human_sorting.html
+    # (See Toothy's implementation in the comments)
+    def atoi(text):
+        return int(text) if text.isdigit() else text
+
+    return [atoi(c) for c in re.split('(\d+)', text)]
+
+
 def get_dataloader_speed(dl, num_steps):
     cnt = 0
     start = time.time()
@@ -171,7 +211,7 @@ def format_bytes(bytes):
 def get_process_memory():
     process = psutil.Process(os.getpid())
     mi = process.memory_info()
-    return mi.rss, mi.vms, mi.vms
+    return mi.rss, mi.vms, mi.shared
 
 
 def ensure_proc_terminate(proc):
@@ -197,3 +237,124 @@ def ensure_proc_terminate(proc):
 
     assert isinstance(proc, multiprocessing.Process)
     atexit.register(stop_proc_by_weak_ref, weakref.ref(proc))
+
+
+def download_file_from_google_drive(ID, destination):
+    """Download file from Google Drive.
+
+    See ``tl.files.load_celebA_dataset`` for example.
+
+    Parameters
+    --------------
+    ID : str
+        The driver ID.
+    destination : str
+        The destination for save file.
+
+    """
+    try:
+        from tqdm import tqdm
+    except ImportError as e:
+        print(e)
+        raise ImportError("Module tqdm not found. Please install tqdm via pip or other package managers.")
+
+    try:
+        import requests
+    except ImportError as e:
+        print(e)
+        raise ImportError("Module requests not found. Please install requests via pip or other package managers.")
+
+    def save_response_content(response, destination, chunk_size=32 * 1024):
+
+        total_size = int(response.headers.get('content-length', 0))
+        with open(destination, "wb") as f:
+            for chunk in tqdm(response.iter_content(chunk_size), total=total_size, unit='B', unit_scale=True,
+                              desc=destination):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+
+    def get_confirm_token(response):
+        for key, value in response.cookies.items():
+            if key.startswith('download_warning'):
+                return value
+        return None
+
+    URL = "https://docs.google.com/uc?export=download"
+    session = requests.Session()
+
+    response = session.get(URL, params={'id': ID}, stream=True)
+    token = get_confirm_token(response)
+
+    if token:
+        params = {'id': ID, 'confirm': token}
+        response = session.get(URL, params=params, stream=True)
+    save_response_content(response, destination)
+
+
+def load_file_list(path=None, regx='\.jpg', printable=True, keep_prefix=False):
+    r"""Return a file list in a folder by given a path and regular expression.
+
+    Parameters
+    ----------
+    path : str or None
+        A folder path, if `None`, use the current directory.
+    regx : str
+        The regx of file name.
+    printable : boolean
+        Whether to print the files infomation.
+    keep_prefix : boolean
+        Whether to keep path in the file name.
+
+    Examples
+    ----------
+    >>> file_list = tl.files.load_file_list(path=None, regx='w1pre_[0-9]+\.(npz)')
+
+    """
+    if path is None:
+        path = os.getcwd()
+    file_list = os.listdir(path)
+    return_list = []
+    for _, f in enumerate(file_list):
+        if re.search(regx, f):
+            return_list.append(f)
+    # return_list.sort()
+    if keep_prefix:
+        for i, f in enumerate(return_list):
+            return_list[i] = os.path.join(path, f)
+
+    if printable:
+        logging.info('Match file list = %s' % return_list)
+        logging.info('Number of files = %d' % len(return_list))
+    return return_list
+
+
+def file_exists(filepath):
+    """Check whether a file exists by given file path."""
+    return os.path.isfile(filepath)
+
+
+def folder_exists(folderpath):
+    """Check whether a folder exists by given folder path."""
+    return os.path.isdir(folderpath)
+
+
+def del_folder(folderpath):
+    """Delete a folder by given folder path."""
+    shutil.rmtree(folderpath)
+
+
+def del_file(filepath):
+    """Delete a file by given file path."""
+    os.remove(filepath)
+
+
+def read_file(filepath):
+    """Read a file and return a string.
+
+    Examples
+    ---------
+    >>> data = tl.files.read_file('data.txt')
+
+    """
+    with open(filepath, 'r') as afile:
+        return afile.read()

@@ -27,26 +27,18 @@ class MultiprocessDataset(DatasetWrapper):
         self.put_idx_worker = None
         for _ in range(num_worker):
             worker = multiprocessing.Process(target=self._worker,
-                                             # args=(self.ds, self.index_queue, self.data_queue))
-                                             args=())
+                                             args=(self.ds, self.index_queue, self.data_queue))
             worker.daemon = True
             worker.start()
 
-    # def _worker(self, ds, index_q, data_q):
-    #     while True:
-    #         idx = index_q.get()
-    #         data_q.put((idx, ds[idx]))
-    def _worker(self):
+    def _worker(self, ds, index_q, data_q):
         while True:
-            idx = self.index_queue.get()
-            self.data_queue.put((idx, self.ds[idx]))
+            idx = index_q.get()
+            data_q.put((idx, ds[idx]))
 
-    # def _put_idxs(self, idxs, index_q):
-    #     for idx in idxs:
-    #         index_q.put(idx)
-    def _put_idxs(self):
-        for idx in self.idxs:
-            self.index_queue.put(idx)
+    def _put_idxs(self, idxs, index_q):
+        for idx in idxs:
+            index_q.put(idx)
 
     def __iter__(self):
         # shutdown put_idx_worker and clear queues from previous epoch
@@ -63,8 +55,7 @@ class MultiprocessDataset(DatasetWrapper):
             self.idxs = np.arange(self.ds_len)
 
         self.put_idx_worker = multiprocessing.Process(target=self._put_idxs,
-                                                      # args=(self.idxs, self.index_queue))
-                                                      args=())
+                                                      args=(self.idxs, self.index_queue))
         self.put_idx_worker.daemon = True
         self.put_idx_worker.start()
 
@@ -109,6 +100,7 @@ class ZMQMultiprocessDataset(DatasetWrapper):
         self.put_idx_worker = None
         for i in range(num_worker):
             # first worker bind the socket, others connect to the socket
+            # however, zmq sockets using ipc do not care about the order of bind / connect
             if i == 0:
                 worker = multiprocessing.Process(target=self._worker,
                                                  args=(True,))
@@ -150,17 +142,18 @@ class ZMQMultiprocessDataset(DatasetWrapper):
             put_idx_socket.send(send_msg, copy=False)
 
     def __iter__(self):
-        # shutdown put_idx_worker and clear queues from previous epoch
-        _shutdown_proc(self.put_idx_worker)
-        # while not self.index_queue.empty():
-        #     self.index_queue.get()
-        # while not self.data_queue.empty():
-        #     self.data_queue.get()
-
         context = zmq.Context()
         collect_data_socket = context.socket(zmq.PULL)
         collect_data_socket.set_hwm(self._hwm)
         collect_data_socket.connect(self.data_pipename)
+
+        # shutdown put_idx_worker and clear queues from previous epoch
+        _shutdown_proc(self.put_idx_worker)
+        try:
+            while True:
+                collect_data_socket.recv(flags=zmq.NOBLOCK)
+        except zmq.ZMQError:
+            pass
 
         # shuffle at the start of every epoch
         if self.shuffle:

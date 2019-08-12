@@ -68,11 +68,9 @@ class BatchedDataset(DatasetWrapper):
             for dp in ds:
                 dp_buffer.append(dp)
                 if len(dp_buffer) == self.batch_size:
-                    # q.put(self._batch_datapoints(dp_buffer))
                     prepare_data_socket.send(convert_to_bytes(self._batch_datapoints(dp_buffer)), copy=False)
                     del dp_buffer[:]
             if not self.drop_remainder:
-                # q.put(self._batch_datapoints(dp_buffer))
                 prepare_data_socket.send(convert_to_bytes(self._batch_datapoints(dp_buffer)), copy=False)
 
     def _BatchedDataset_worker(self, ds, pipe):
@@ -84,11 +82,9 @@ class BatchedDataset(DatasetWrapper):
             for dp in ds:
                 dp_buffer.append(dp)
                 if len(dp_buffer) == self.batch_size:
-                    # q.put(self._batch_datapoints(dp_buffer))
                     pipe_input.send(self._batch_datapoints(dp_buffer))
                     del dp_buffer[:]
             if not self.drop_remainder:
-                # q.put(self._batch_datapoints(dp_buffer))
                 pipe_input.send(self._batch_datapoints(dp_buffer))
 
     def __iter__(self):
@@ -309,15 +305,15 @@ class Dataloader(DatasetWrapper):
         # the environment variable starts with 'ipc://', so file name starts from 6
         try:
             os.remove(os.environ['put_idx'][6:])
-        except FileNotFoundError:
+        except (FileNotFoundError, KeyError):
             pass
         try:
             os.remove(os.environ['collect_data'][6:])
-        except FileNotFoundError:
+        except (FileNotFoundError, KeyError):
             pass
         try:
             os.remove(os.environ['batch_prefetch'][6:])
-        except FileNotFoundError:
+        except (FileNotFoundError, KeyError):
             pass
 
 

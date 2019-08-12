@@ -3,8 +3,8 @@ import os
 import logging
 import cv2
 
-from dataloader.base import Dataset
-from dataloader.utils import maybe_download_and_extract
+from ..base import Dataset
+from ..utils import maybe_download_and_extract
 
 __all__ = ['ILSVRCMeta', 'ILSVRC12', 'ILSVRC12Files']
 
@@ -169,15 +169,6 @@ class ILSVRC12Files(Dataset):
         fname = os.path.join(self.full_path, fname)
         return fname, label
 
-    # def __iter__(self):
-    #     idxs = np.arange(len(self.imglist))
-    #     if self.shuffle:
-    #         self.rng.shuffle(idxs)
-    #     for k in idxs:
-    #         fname, label = self.imglist[k]
-    #         fname = os.path.join(self.full_dir, fname)
-    #         yield [fname, label]
-
 
 class ILSVRC12(ILSVRC12Files):
     """
@@ -295,16 +286,3 @@ class ILSVRC12(ILSVRC12Files):
     #                 ret.append(None)
     #         logger.info("{}/{} images have bounding box.".format(cnt, len(imglist)))
     #     return ret
-
-
-# if __name__ == '__main__':
-#     meta = ILSVRCMeta()
-#     # print(meta.get_synset_words_1000())
-#
-#     ds = ILSVRC12('/home/wyx/data/fake_ilsvrc/', 'train', shuffle=False)
-#     ds.reset_state()
-#
-#     for k in ds:
-#         from IPython import embed
-#         embed()
-#         break
