@@ -11,11 +11,13 @@ from ..utils import maybe_download_and_extract
 
 __all__ = ['load_matt_mahoney_text8_dataset']
 
-MATT_MAHONEY_URL = 'http://mattmahoney.net/dc/text8.zip'
+MATT_MAHONEY_BASE_URL = 'http://mattmahoney.net/dc/'
+MATT_MAHONEY_FILENAME = 'text8.zip'
 
 
-def load_matt_mahoney_text8_dataset(path='data', name='mm_test8'):
-    """Load Matt Mahoney's dataset.
+def load_matt_mahoney_text8_dataset(name='mm_test8', path='raw_data'):
+    """
+    Load Matt Mahoney's dataset.
 
     Download a text file from Matt Mahoney's website
     if not present, and make sure it's the right size.
@@ -24,8 +26,10 @@ def load_matt_mahoney_text8_dataset(path='data', name='mm_test8'):
 
     Parameters
     ----------
+    name : str
+        The name of the dataset.
     path : str
-        The path that the data is downloaded to, defaults is ``data/mm_test8/``.
+        The path that the data is downloaded to, defaults is ``raw_data/mm_test8/``.
 
     Returns
     --------
@@ -41,8 +45,7 @@ def load_matt_mahoney_text8_dataset(path='data', name='mm_test8'):
     path = os.path.join(path, name)
     logging.info("Load or Download matt_mahoney_text8 Dataset> {}".format(path))
 
-    filename = 'text8.zip'
-    maybe_download_and_extract(filename, path, MATT_MAHONEY_URL, expected_bytes=31344016)
+    maybe_download_and_extract(MATT_MAHONEY_FILENAME, path, MATT_MAHONEY_BASE_URL, expected_bytes=31344016)
 
     with zipfile.ZipFile(os.path.join(path, filename)) as f:
         word_list = f.read(f.namelist()[0]).split()
@@ -52,8 +55,18 @@ def load_matt_mahoney_text8_dataset(path='data', name='mm_test8'):
 
 
 class MattMahoney(Dataset):
+    """
+    Load Matt Mahoney's dataset.
 
-    def __init__(self, path='data', name='mm_test8'):
+    Parameters
+    ----------
+    name : str
+        The name of the dataset.
+    path : str
+        The path that the data is downloaded to, defaults is ``raw_data/mm_test8/``.
+    """
+
+    def __init__(self, name='mm_test8', path='raw_data'):
         self.word_list = load_matt_mahoney_text8_dataset(path, name)
 
     def __getitem__(self, index):

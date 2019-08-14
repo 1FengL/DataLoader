@@ -11,12 +11,13 @@ from ..utils import maybe_download_and_extract
 
 __all__ = ['load_ptb_dataset']
 
-PTB_URL = 'http://www.fit.vutbr.cz/~imikolov/rnnlm/simple-examples.tgz'
+PTB_URL = 'http://www.fit.vutbr.cz/~imikolov/rnnlm/'
 PTB_FILENAME = 'simple-examples.tgz'
 
 
-def load_ptb_dataset(path='data', name='ptb'):
-    """Load Penn TreeBank (PTB) dataset.
+def load_ptb_dataset(name='ptb', path='raw_data'):
+    """
+    Load Penn TreeBank (PTB) dataset.
 
     It is used in many LANGUAGE MODELING papers,
     including "Empirical Evaluation and Combination of Advanced Language
@@ -26,8 +27,10 @@ def load_ptb_dataset(path='data', name='ptb'):
 
     Parameters
     ----------
+    name : str
+        The name of the dataset.
     path : str
-        The path that the data is downloaded to, defaults is ``data/ptb/``.
+        The path that the data is downloaded to, defaults is ``raw_data/ptb/``.
 
     Returns
     --------
@@ -77,8 +80,28 @@ def load_ptb_dataset(path='data', name='ptb'):
 
 
 class PTB(Dataset):
+    """
+    Load Penn TreeBank (PTB) dataset.
 
-    def __init__(self, train_or_test_or_valid, num_steps, path='data', name='ptb'):
+    It is used in many LANGUAGE MODELING papers,
+    including "Empirical Evaluation and Combination of Advanced Language
+    Modeling Techniques", "Recurrent Neural Network Regularization".
+    It consists of 929k training words, 73k validation words, and 82k test
+    words. It has 10k words in its vocabulary.
+
+    Parameters
+    ----------
+    train_or_test_or_valid : str
+        Must be either 'train' or 'test' or 'valid'. Choose the training or test or validation dataset.
+    num_steps : int
+        The number of unrolls. i.e. sequence_length
+    name : str
+        The name of the dataset.
+    path : str
+        The path that the data is downloaded to, defaults is ``raw_data/ptb/``.
+    """
+
+    def __init__(self, train_or_test_or_valid, num_steps, name='ptb', path='raw_data'):
         path = os.path.expanduser(path)
         self.path = os.path.join(path, name)
         logging.info("Load or Download Penn TreeBank (PTB) dataset > {}".format(self.path))

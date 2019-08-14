@@ -24,7 +24,7 @@ def load_celebA_dataset(name='celebA', path='raw_data'):
     Parameters
     -----------
     name : str
-        The name of the data folder
+        The name of the dataset.
     path : str
         The path that the data is downloaded to, defaults is ``raw_data/celebA/``.
     """
@@ -57,7 +57,7 @@ class CelebAFiles(Dataset):
     Parameters
     -----------
     name : str
-        The name of the data folder
+        The name of the dataset
     path : str
         The path that the data is downloaded to, defaults is ``raw_data/celebA/``.
     """
@@ -78,7 +78,7 @@ class CelebA(CelebAFiles):
     Parameters
     -----------
     name : str
-        The name of the data folder
+        The name of the dataset.
     path : str
         The path that the data is downloaded to, defaults is ``raw_data/celebA/``.
     shape : tuple

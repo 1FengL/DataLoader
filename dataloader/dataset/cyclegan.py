@@ -13,19 +13,21 @@ from ..utils import maybe_download_and_extract, folder_exists, del_file, load_fi
 
 __all__ = ['load_cyclegan_dataset', 'CycleGAN', 'CycleGANFiles']
 
-CYCLEGAN_URL = 'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/summer2winter_yosemite'
+CYCLEGAN_BASE_URL = 'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/'
 
 
-def load_cyclegan_dataset(name='cyclegan', path='raw_data'):
+def load_cyclegan_dataset(name='cyclegan', path='raw_data', filename='summer2winter_yosemite'):
     """
     Load images from CycleGAN's database, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`.
 
     Parameters
     ------------
     name : str
-        The dataset you want, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`__.
+        The name of the dataset.
     path : str
-        The path that the data is downloaded to, defaults is `raw_data/cyclegan`
+        The path that the data is downloaded to, defaults is `raw_data/cyclegan`.
+    filename : str
+        The dataset you want, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`.
 
     Examples
     ---------
@@ -33,12 +35,11 @@ def load_cyclegan_dataset(name='cyclegan', path='raw_data'):
 
     """
     path = os.path.join(path, name)
-    filename = 'summer2winter_yosemite'
 
     if folder_exists(os.path.join(path, filename)) is False:
         logging.info("[*] {} is nonexistent in {}".format(filename, path))
         filepath = maybe_download_and_extract(filename=filename + '.zip', working_directory=path,
-                                              url_source=CYCLEGAN_URL, extract=True)
+                                              url_source=CYCLEGAN_BASE_URL, extract=True)
         del_file(filepath)
 
     def load_image_from_folder(path):
@@ -67,26 +68,27 @@ def load_cyclegan_dataset(name='cyclegan', path='raw_data'):
 
 class CycleGANFiles(Dataset):
     """
-    Load images from CycleGAN's database, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`.
+    Load image file names from CycleGAN's database, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`.
 
     Parameters
     ------------
     train_or_test : str
-        The data
+        Must be either 'train' or 'test'. Choose the training or test dataset.
     name : str
-        The dataset you want, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`__.
+        The name of the dataset.
     path : str
         The path that the data is downloaded to, defaults is `raw_data/cyclegan`
+    filename : str
+        The dataset you want, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`.
     """
-    def __init__(self, train_or_test, name='cyclegan', path='raw_data'):
+    def __init__(self, train_or_test, name='cyclegan', path='raw_data', filename='summer2winter_yosemite'):
         self.path = os.path.join(path, name)
         self.train_or_test = train_or_test
-        filename = 'summer2winter_yosemite'
 
         if folder_exists(os.path.join(path, filename)) is False:
             logging.info("[*] {} is nonexistent in {}".format(filename, path))
             filepath = maybe_download_and_extract(filename=filename + '.zip', working_directory=path,
-                                                  url_source=CYCLEGAN_URL, extract=True)
+                                                  url_source=CYCLEGAN_BASE_URL, extract=True)
             del_file(filepath)
 
         assert self.train_or_test in ['train', 'test']
@@ -106,10 +108,26 @@ class CycleGANFiles(Dataset):
 
 
 class CycleGAN(CycleGANFiles):
-    def __init__(self, train_or_test, name='cyclegan', path='data'):
-        super(CycleGAN, self).__init__(train_or_test, name, path)
+    """
+    Load images from CycleGAN's database, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`.
+
+    Parameters
+    ------------
+    train_or_test : str
+        Must be either 'train' or 'test'. Choose the training or test dataset.
+    name : str
+        The name of the dataset.
+    path : str
+        The path that the data is downloaded to, defaults is `raw_data/cyclegan`
+    filename : str
+        The dataset you want, see `this link <https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/>`.
+    """
+    def __init__(self, train_or_test, name='cyclegan', path='raw_data', filename='summer2winter_yosemite'):
+        super(CycleGAN, self).__init__(train_or_test, name, path, filename)
 
     def __getitem__(self, index):
         imA = cv2.imread(self.im_A_path)
         imB = cv2.imread(self.im_B_path)
+        imA = np.array(imA, dtype=np.float32)
+        imB = np.array(imB, dtype=np.float32)
         return imA, imB

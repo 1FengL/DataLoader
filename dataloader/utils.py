@@ -97,7 +97,7 @@ def download(filename, working_directory, url_source):
 
     logging.info('Downloading %s...\n' % filename)
 
-    urlretrieve(url_source, filepath, reporthook=_dlProgress)
+    urlretrieve(url_source + filename, filepath, reporthook=_dlProgress)
 
 
 def maybe_download_and_extract(filename, working_directory, url_source, extract=False, expected_bytes=None):
@@ -307,7 +307,7 @@ def load_file_list(path=None, regx='\.jpg', printable=True, keep_prefix=False):
 
     Examples
     ----------
-    >>> file_list = tl.files.load_file_list(path=None, regx='w1pre_[0-9]+\.(npz)')
+    >>> file_list = load_file_list(path=None, regx='w1pre_[0-9]+\.(npz)')
 
     """
     if path is None:
@@ -353,8 +353,7 @@ def read_file(filepath):
 
     Examples
     ---------
-    >>> data = tl.files.read_file('data.txt')
-
+    >>> data = read_file('data.txt')
     """
     with open(filepath, 'r') as afile:
         return afile.read()

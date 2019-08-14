@@ -10,17 +10,20 @@ from ..utils import maybe_download_and_extract
 
 __all__ = ['load_nietzsche_dataset']
 
-NIETZSCHE_URL = 'https://s3.amazonaws.com/text-datasets/nietzsche.txt'
-NIETZSCHE_FILENAME = "nietzsche.txt"
+NIETZSCHE_BASE_URL = 'https://s3.amazonaws.com/text-datasets/'
+NIETZSCHE_FILENAME = 'nietzsche.txt'
 
 
-def load_nietzsche_dataset(path='data', name='nietzsche'):
-    """Load Nietzsche dataset.
+def load_nietzsche_dataset(name='nietzsche', path='raw_data'):
+    """
+    Load Nietzsche dataset.
 
     Parameters
     ----------
+    name : str
+        The name of the dataset.
     path : str
-        The path that the data is downloaded to, defaults is ``data/nietzsche/``.
+        The path that the data is downloaded to, defaults is ``raw_data/nietzsche/``.
 
     Returns
     --------
@@ -38,7 +41,7 @@ def load_nietzsche_dataset(path='data', name='nietzsche'):
     logging.info("Load or Download nietzsche dataset > {}".format(path))
     path = os.path.join(path, name)
 
-    filepath = maybe_download_and_extract(NIETZSCHE_FILENAME, path, NIETZSCHE_URL)
+    filepath = maybe_download_and_extract(NIETZSCHE_FILENAME, path, NIETZSCHE_BASE_URL)
 
     with open(filepath, "r") as f:
         words = f.read()
@@ -46,8 +49,18 @@ def load_nietzsche_dataset(path='data', name='nietzsche'):
 
 
 class NIETZSCHE(Dataset):
+    """
+    Load Nietzsche dataset.
 
-    def __init__(self, path='data', name='nietzsche'):
+    Parameters
+    ----------
+    name : str
+        The name of the dataset.
+    path : str
+        The path that the data is downloaded to, defaults is ``raw_data/nietzsche/``.
+    """
+
+    def __init__(self, name='nietzsche', path='raw_data'):
         self.words = load_nietzsche_dataset(path, name)
 
     def __getitem__(self, index):

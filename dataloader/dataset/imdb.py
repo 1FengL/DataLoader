@@ -12,24 +12,30 @@ from ..utils import maybe_download_and_extract
 
 __all__ = ['load_imdb_dataset']
 
-IMDB_URL = 'https://s3.amazonaws.com/text-datasets/imdb.pkl'
+IMDB_BASE_URL = 'https://s3.amazonaws.com/text-datasets/'
+IMDB_FILENAME = 'imdb.pkl'
 
 
 def load_imdb_dataset(
-        path='data', name='imdb', nb_words=None, skip_top=0, maxlen=None, test_split=0.2, seed=113, start_char=1,
+        name='imdb', path='raw_data', nb_words=None, skip_top=0, maxlen=None, test_split=0.2, seed=113, start_char=1,
         oov_char=2, index_from=3):
-    """Load IMDB dataset.
+    """
+    Load IMDB dataset.
 
     Parameters
     ----------
+    name : str
+        The name of the dataset.
     path : str
-        The path that the data is downloaded to, defaults is ``data/imdb/``.
+        The path that the data is downloaded to, defaults is ``raw_data/imdb/``.
     nb_words : int
         Number of words to get.
     skip_top : int
         Top most frequent words to ignore (they will appear as oov_char value in the sequence data).
     maxlen : int
         Maximum sequence length. Any longer sequence will be truncated.
+    test_split : float
+        Split of train / test dataset.
     seed : int
         Seed for reproducible data shuffling.
     start_char : int
@@ -41,8 +47,7 @@ def load_imdb_dataset(
 
     Examples
     --------
-    >>> X_train, y_train, X_test, y_test = tl.files.load_imdb_dataset(
-    ...                                 nb_words=20000, test_split=0.2)
+    >>> X_train, y_train, X_test, y_test = load_imdb_dataset(nb_words=20000, test_split=0.2)
     >>> print('X_train.shape', X_train.shape)
     (20000,)  [[1, 62, 74, ... 1033, 507, 27],[1, 60, 33, ... 13, 1053, 7]..]
     >>> print('y_train.shape', y_train.shape)
@@ -110,21 +115,38 @@ def _preprocess_imdb(X, index_from, labels, maxlen, nb_words, oov_char, skip_top
 
 def _load_raw_imdb(path, name):
     path = os.path.join(path, name)
-    filename = 'imdb.pkl'
-    maybe_download_and_extract(filename, path, IMDB_URL)
-    if filename.endswith(".gz"):
-        f = gzip.open(os.path.join(path, filename), 'rb')
-    else:
-        f = open(os.path.join(path, filename), 'rb')
+    maybe_download_and_extract(IMDB_FILENAME, path, IMDB_BASE_URL)
+    f = open(os.path.join(path, IMDB_FILENAME), 'rb')
     X, labels = pickle.load(f)
     f.close()
     return X, labels
 
 
 class IMDB(Dataset):
+    """
+    Load IMDB dataset.
 
-    def __init__(self, path='data', name='imdb', nb_words=None, skip_top=0, maxlen=None, test_split=0.2, seed=113,
-                 start_char=1, oov_char=2,
+    Parameters
+    ----------
+    name : str
+        The name of the dataset.
+    path : str
+        The path that the data is downloaded to, defaults is ``raw_data/imdb/``.
+    nb_words : int
+        Number of words to get.
+    skip_top : int
+        Top most frequent words to ignore (they will appear as oov_char value in the sequence data).
+    maxlen : int
+        Maximum sequence length. Any longer sequence will be truncated.
+    start_char : int
+        The start of a sequence will be marked with this character. Set to 1 because 0 is usually the padding character.
+    oov_char : int
+        Words that were cut out because of the num_words or skip_top limit will be replaced with this character.
+    index_from : int
+        Index actual words with this index and higher.
+    """
+
+    def __init__(self, name='imdb', path='raw_data', nb_words=None, skip_top=0, maxlen=None, start_char=1, oov_char=2,
                  index_from=3):
         self.X, self.labels = _load_raw_imdb(path, name)
         self.X, self.labels = _preprocess_imdb(self.X, index_from, self.labels, maxlen, nb_words, oov_char, skip_top,

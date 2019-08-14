@@ -3,15 +3,16 @@ import logging
 import os
 import numpy as np
 
-from dataloader.base import Dataset
-from dataloader.utils import maybe_download_and_extract
+from ..base import Dataset
+from ..utils import maybe_download_and_extract
 
 __all__ = ['MNIST', 'load_mnist_dataset']
 
-MNIST_TRAIN_IMAGE_URL = 'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz'
-MNIST_TRAIN_LABEL_URL = 'http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz'
-MNIST_TEST_IMAGE_URL = 'http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz'
-MNIST_TEST_LABEL_URL = 'http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz'
+MNIST_BASE_URL = 'http://yann.lecun.com/exdb/mnist/'
+MNIST_TRAIN_IMAGE_FILENAME = 'train-images-idx3-ubyte.gz'
+MNIST_TRAIN_LABEL_FILENAME = 'train-labels-idx1-ubyte.gz'
+MNIST_TEST_IMAGE_FILENAME = 't10k-images-idx3-ubyte.gz'
+MNIST_TEST_LABEL_FILENAME = 't10k-labels-idx1-ubyte.gz'
 
 
 def _load_mnist_images(name, url, path, shape):
@@ -40,26 +41,27 @@ def _load_mnist_labels(name, url, path):
     return data
 
 
-def load_mnist_dataset(shape=(-1, 784), path='data', name='mnist'):
-    """A generic function to load mnist-like dataset.
+def load_mnist_dataset(shape=(-1, 784), name='mnist', path='raw_data'):
+    """
+    A generic function to load mnist-like dataset.
 
     Parameters:
     ----------
     shape : tuple
         The shape of digit images.
-    path : str
-        The path that the data is downloaded to.
     name : str
-        The dataset name you want to use(the default is 'mnist').
+        The name of the dataset.
+    path : str
+        The path that the data is downloaded to, defaults is ``raw_data/mnist/``.
     """
     path = os.path.join(path, name)
 
     # Download and read the training and test set images and labels.
     logging.info("Load or Download {0} > {1}".format(name.upper(), path))
-    X_train = _load_mnist_images(name='train-images-idx3-ubyte.gz', url=MNIST_TRAIN_IMAGE_URL, path=path, shape=shape)
-    y_train = _load_mnist_labels(name='train-labels-idx1-ubyte.gz', url=MNIST_TRAIN_LABEL_URL, path=path)
-    X_test = _load_mnist_images(name='t10k-images-idx3-ubyte.gz', url=MNIST_TEST_IMAGE_URL, path=path, shape=shape)
-    y_test = _load_mnist_labels(name='t10k-labels-idx1-ubyte.gz', url=MNIST_TEST_LABEL_URL, path=path)
+    X_train = _load_mnist_images(name=MNIST_TRAIN_IMAGE_FILENAME, url=MNIST_BASE_URL, path=path, shape=shape)
+    y_train = _load_mnist_labels(name=MNIST_TRAIN_LABEL_FILENAME, url=MNIST_BASE_URL, path=path)
+    X_test = _load_mnist_images(name=MNIST_TEST_IMAGE_FILENAME, url=MNIST_BASE_URL, path=path, shape=shape)
+    y_test = _load_mnist_labels(name=MNIST_TEST_LABEL_FILENAME, url=MNIST_BASE_URL, path=path)
 
     # We reserve the last 10000 training examples for validation.
     X_train, X_val = X_train[:-10000], X_train[-10000:]
@@ -77,20 +79,34 @@ def load_mnist_dataset(shape=(-1, 784), path='data', name='mnist'):
 
 
 class MNIST(Dataset):
-    def __init__(self, train_or_test, path='data', name='mnist', shape=(-1, 784)):
+    """
+    Load MNIST dataset.
+
+    Parameters:
+    ----------
+    train_or_test : str
+        Must be either 'train' or 'test'. Choose the training or test dataset.
+    shape : tuple
+        The shape of digit images.
+    name : str
+        The name of the dataset.
+    path : str
+        The path that the data is downloaded to, defaults is ``raw_data/mnist/``.
+    """
+    def __init__(self, train_or_test, path='raw_data', name='mnist', shape=(-1, 784)):
         path = os.path.expanduser(path)
         self.path = os.path.join(path, name)
 
         assert train_or_test in ['train', 'test']
         self.train_or_test = train_or_test
         if train_or_test == 'train':
-            self.images = _load_mnist_images(name='train-images-idx3-ubyte.gz', url=MNIST_TRAIN_IMAGE_URL, path=path,
+            self.images = _load_mnist_images(name=MNIST_TRAIN_IMAGE_FILENAME, url=MNIST_BASE_URL, path=path,
                                              shape=shape)
-            self.labels = _load_mnist_labels(name='train-labels-idx1-ubyte.gz', url=MNIST_TRAIN_LABEL_URL, path=path)
+            self.labels = _load_mnist_labels(name=MNIST_TRAIN_LABEL_FILENAME, url=MNIST_BASE_URL, path=path)
         else:
-            self.images = _load_mnist_images(name='t10k-images-idx3-ubyte.gz', url=MNIST_TEST_IMAGE_URL, path=path,
+            self.images = _load_mnist_images(name=MNIST_TEST_IMAGE_FILENAME, url=MNIST_BASE_URL, path=path,
                                              shape=shape)
-            self.labels = _load_mnist_labels(name='t10k-labels-idx1-ubyte.gz', url=MNIST_TEST_LABEL_URL, path=path)
+            self.labels = _load_mnist_labels(name=MNIST_TEST_LABEL_FILENAME, url=MNIST_BASE_URL, path=path)
 
     def __len__(self):
         return self.images.shape[0]

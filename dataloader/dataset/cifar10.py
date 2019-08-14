@@ -9,7 +9,7 @@ from dataloader.utils import maybe_download_and_extract
 
 __all__ = ['load_cifar10_dataset', 'CIFAR10']
 
-CIFAR10_URL = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+CIFAR10_BASE_URL = 'https://www.cs.toronto.edu/~kriz/'
 CIFAR10_FILENAME = 'cifar-10-python.tar.gz'
 
 
@@ -44,7 +44,7 @@ def load_cifar10_dataset(shape=(-1, 32, 32, 3), path='raw_data', name='cifar10',
     shape : tuple
         The shape of digit images e.g. (-1, 3, 32, 32) and (-1, 32, 32, 3).
     name : str
-        The name of the data folder
+        The name of the dataset.
     path : str
         The path that the data is downloaded to, defaults is ``raw_data/cifar10/``.
     plotable : boolean
@@ -65,7 +65,7 @@ def load_cifar10_dataset(shape=(-1, 32, 32, 3), path='raw_data', name='cifar10',
     logging.info("Load or Download cifar10 > {}".format(path))
 
     # Download and uncompress file
-    maybe_download_and_extract(CIFAR10_FILENAME, path, CIFAR10_URL, extract=True)
+    maybe_download_and_extract(CIFAR10_FILENAME, path, CIFAR10_BASE_URL, extract=True)
 
     # Unpickle file and fill in data
     X_train = None
@@ -145,10 +145,14 @@ class CIFAR10(Dataset):
 
     Parameters
     ----------
-    shape : tuple
-        The shape of digit images e.g. (-1, 3, 32, 32) and (-1, 32, 32, 3).
+    train_or_test : str
+        Must be either 'train' or 'test'. Choose the training or test dataset.
+    name : str
+        The name of the dataset.
     path : str
         The path that the data is downloaded to, defaults is ``raw_data/cifar10/``.
+    shape : tuple
+        The shape of digit images e.g. (-1, 3, 32, 32) and (-1, 32, 32, 3).
     """
     def __init__(self, train_or_test, path='raw_data', name='cifar10', shape=(-1, 32, 32, 3)):
         self.path = os.path.join(path, name)
@@ -156,7 +160,7 @@ class CIFAR10(Dataset):
         # Download and read the training and test set images and labels.
         logging.info("Load or Download {0} > {1}".format(name.upper(), self.path))
 
-        maybe_download_and_extract(CIFAR10_FILENAME, path, CIFAR10_URL, extract=True)
+        maybe_download_and_extract(CIFAR10_FILENAME, path, CIFAR10_BASE_URL, extract=True)
 
         assert train_or_test in ['train', 'test']
         if train_or_test == 'train':
