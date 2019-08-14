@@ -67,8 +67,8 @@ class myTransform(Transform):
 
 
 if __name__ == '__main__':
-    ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test='train',
-                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
+    ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test_or_val='train',
+                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12/ilsvrc', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
     for img, label in ds:
         print(img.shape, label)
         exit(1)

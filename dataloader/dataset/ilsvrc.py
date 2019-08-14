@@ -127,7 +127,7 @@ class ILSVRC12Files(Dataset):
         self.full_path = os.path.join(path, train_or_test_or_val)
         self.path = train_or_test_or_val
 
-        meta = ILSVRCMeta(meta_dir)
+        meta = ILSVRCMeta(path=meta_dir)
         self.imglist = meta.get_image_list(train_or_test_or_val)
 
     def __len__(self):
