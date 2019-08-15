@@ -1,15 +1,16 @@
 import tensorflow as tf
+import torch
 
-from dataloader.common import Dataloader, TFDataloader
-from dataloader.dataset import *
-from dataloader.image import *
-from dataloader.utils import *
+from ..dataloader.common import Dataloader, TFDataloader
+from ..dataloader.dataset import *
+from ..dataloader.image import *
+from ..dataloader.utils import *
 
 RESIZE_HEIGHT = 256
 RESIZE_WIDTH = 256
 
 
-def measure_dl_speed(dl, num_steps):
+def measure_dl_speed(dl, num_steps, warm_up=10):
     net = tf.keras.applications.resnet50.ResNet50(include_top=True,
                                                   weights='imagenet',
                                                   classes=1000)
@@ -21,7 +22,15 @@ def measure_dl_speed(dl, num_steps):
     rss_sum, vms_sum, shared_sum = 0, 0, 0
     rss_before, vms_before, shared_before = get_process_memory()
     loading_time_start = time.time()
+
+    warm_up_cnt = 0
+
     for img, label in dl:
+        if warm_up_cnt < warm_up:
+            warm_up_cnt += 1
+            loading_time_start = time.time()
+            continue
+
         loading_time_end = time.time()
         loading_time_sum += loading_time_end - loading_time_start
         rss_after, vms_after, shared_after = get_process_memory()
@@ -56,28 +65,27 @@ def measure_dl_speed(dl, num_steps):
 
 class myTransform(Transform):
 
-    def __init__(self, is_tf=True):
-        self.is_tf = is_tf
-
     def __call__(self, img, label):
-        if not self.is_tf:
-            img = np.array(img, dtype=np.float32)
         img /= 255
         return img, label
 
 
 if __name__ == '__main__':
     ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test_or_val='train',
-                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12/ilsvrc', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
-    for img, label in ds:
-        print(img.shape, label)
-        exit(1)
+                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
+
+    print("######  Dataloader  ######")
     dl = Dataloader(ds, output_types=(np.float32, np.int32), batch_size=32, shuffle=False, num_worker=4,
                     transforms=[myTransform()])
-    print("######  Dataloader  ######")
     measure_dl_speed(dl, num_steps=10)
 
+    print("######  TFDataloader  ######")
     dl = TFDataloader(ds, output_types=(tf.float32, tf.int32), shuffle=False, batch_size=32,
                       transforms=[myTransform()])
-    print("######  Dataloader  ######")
+    measure_dl_speed(dl, num_steps=10)
+
+    print("######  TorchDataloader  ######")
+    dl = torch.utils.data.DataLoader(ds,
+                                     batch_size=4, shuffle=True,
+                                     num_workers=4)
     measure_dl_speed(dl, num_steps=10)
