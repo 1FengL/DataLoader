@@ -10,7 +10,20 @@ RESIZE_HEIGHT = 256
 RESIZE_WIDTH = 256
 
 
-def measure_dl_speed(dl_choice, num_steps, warm_up=10):
+def measure_dl_speed(dl_choice, num_steps, batch_size, num_worker, warm_up=5):
+    ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test_or_val='train',
+                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
+    assert dl_choice in ('tf', 'tl', 'torch')
+    if dl_choice == 'tf':
+        dl = TFDataloader(ds, output_types=(tf.float32, tf.int32), shuffle=False, batch_size=batch_size,
+                          transforms=[myTransform()])
+    elif dl_choice == 'tl':
+        dl = Dataloader(ds, output_types=(np.float32, np.int32), batch_size=batch_size, shuffle=False,
+                        num_worker=num_worker,
+                        transforms=[myTransform()])
+    elif dl_choice == 'torch':
+        dl = torchDataloader(ds, batch_size=batch_size, shuffle=True, num_workers=num_worker)
+
     net = tf.keras.applications.resnet50.ResNet50(include_top=True,
                                                   weights='imagenet',
                                                   classes=1000)
@@ -20,28 +33,14 @@ def measure_dl_speed(dl_choice, num_steps, warm_up=10):
     cnt = 0
     loading_time_sum, training_time_sum = 0, 0
 
-    ds = ILSVRC12(path='/home/dsimsc/data/luoyifeng/ILSVRC12', train_or_test_or_val='train',
-                  meta_dir='/home/dsimsc/data/luoyifeng/ILSVRC12', shape=(RESIZE_HEIGHT, RESIZE_WIDTH))
-    assert dl_choice in ('tf', 'tl', 'torch')
-    if dl_choice == 'tf':
-        dl = TFDataloader(ds, output_types=(tf.float32, tf.int32), shuffle=False, batch_size=32,
-                          transforms=[myTransform()])
-    elif dl_choice == 'tl':
-        dl = Dataloader(ds, output_types=(np.float32, np.int32), batch_size=32, shuffle=False, num_worker=4,
-                        transforms=[myTransform()])
-    elif dl_choice == 'torch':
-        dl = torchDataloader(ds, batch_size=4, shuffle=True, num_workers=4)
-
     warm_up_cnt = 0
     loading_time_start = time.time()
     for img, label in dl:
         if warm_up_cnt < warm_up:
-            warm_up_cnt += 1
-            loading_time_start = time.time()
-            continue
-
-        loading_time_end = time.time()
-        loading_time_sum += loading_time_end - loading_time_start
+            pass
+        else:
+            loading_time_end = time.time()
+            loading_time_sum += loading_time_end - loading_time_start
 
         if dl_choice == 'torch':
             img = img.numpy()
@@ -55,15 +54,17 @@ def measure_dl_speed(dl_choice, num_steps, warm_up=10):
         grad = tape.gradient(loss, weights)
         optimizer.apply_gradients(zip(grad, weights))
 
-        training_time_end = time.time()
-        training_time_sum += training_time_end - training_time_start
-
-        print("Loss: ", loss, " | Loading: ", loading_time_end - loading_time_start, " | Training: ",
-              training_time_end - training_time_start)
-
-        cnt += 1
-        if cnt == num_steps:
-            break
+        if warm_up_cnt < warm_up:
+            warm_up_cnt += 1
+            print("warming up...")
+        else:
+            training_time_end = time.time()
+            training_time_sum += training_time_end - training_time_start
+            print("Loss: ", loss, " | Loading: ", loading_time_end - loading_time_start, " | Training: ",
+                  training_time_end - training_time_start)
+            cnt += 1
+            if cnt == num_steps:
+                break
 
         loading_time_start = time.time()
 
@@ -73,11 +74,11 @@ def measure_dl_speed(dl_choice, num_steps, warm_up=10):
 class myTransform(Transform):
 
     def __call__(self, img, label):
-        img = cv2.flip(img, flipCode=1)
+        img = img[:, ::-1, :]
         img -= 127.5
         img /= 127.5
         return img, label
 
 
 if __name__ == '__main__':
-    measure_dl_speed(dl_choice='tl', num_steps=10)
+    measure_dl_speed(dl_choice='tf', num_steps=10, num_worker=4, batch_size=32)

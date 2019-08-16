@@ -326,6 +326,7 @@ class TFDataloader(DatasetWrapper):
                  shuffle_buffer_size=None,
                  batch_size=1,
                  drop_remainder=True,
+                 num_worker = tf.data.experimental.AUTOTUNE,
                  # num_extract_worker=os.cpu_count(),
                  # num_map_worker=os.cpu_count(),
                  # num_prefetch=None,
@@ -355,7 +356,7 @@ class TFDataloader(DatasetWrapper):
 
         if self.transforms is not None:
             self.ds = self.ds.map(map_func=_Transforms_for_tf_dataset(self.transforms),
-                                  num_parallel_calls=tf.data.experimental.AUTOTUNE)
+                                  num_parallel_calls=num_worker)
 
         if self.batch_size > 1:
             self.ds = self.ds.batch(batch_size=self.batch_size, drop_remainder=self.drop_remainder)
