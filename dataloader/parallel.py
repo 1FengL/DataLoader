@@ -6,8 +6,9 @@ import uuid
 import zmq
 import numpy as np
 
-from dataloader.base import DatasetWrapper
-from dataloader.serialize import *
+from .base import DatasetWrapper
+from .serialize import *
+from .utils import ensure_subprocess_terminate, ensure_subsubprocess_terminate, shutdown_proc
 
 
 class MultiprocessDataset(DatasetWrapper):
@@ -28,8 +29,8 @@ class MultiprocessDataset(DatasetWrapper):
         for _ in range(num_worker):
             worker = multiprocessing.Process(target=self._worker,
                                              args=(self.ds, self.index_queue, self.data_queue))
-            worker.daemon = True
             worker.start()
+            ensure_subprocess_terminate(worker)
 
     def _worker(self, ds, index_q, data_q):
         while True:
@@ -42,7 +43,7 @@ class MultiprocessDataset(DatasetWrapper):
 
     def __iter__(self):
         # shutdown put_idx_worker and clear queues from previous epoch
-        _shutdown_proc(self.put_idx_worker)
+        shutdown_proc(self.put_idx_worker)
         while not self.index_queue.empty():
             self.index_queue.get()
         while not self.data_queue.empty():
@@ -56,8 +57,8 @@ class MultiprocessDataset(DatasetWrapper):
 
         self.put_idx_worker = multiprocessing.Process(target=self._put_idxs,
                                                       args=(self.idxs, self.index_queue))
-        self.put_idx_worker.daemon = True
         self.put_idx_worker.start()
+        ensure_subsubprocess_terminate(self.put_idx_worker)
 
         data_buffer = {}
         for return_idx in self.idxs:
@@ -71,15 +72,7 @@ class MultiprocessDataset(DatasetWrapper):
                         break
                     else:
                         data_buffer[idx] = dp
-        _shutdown_proc(self.put_idx_worker)
-
-
-def _shutdown_proc(proc):
-    if proc is None:
-        return
-    if proc.is_alive():
-        proc.terminate()
-        proc.join()
+        shutdown_proc(self.put_idx_worker)
 
 
 class ZMQMultiprocessDataset(DatasetWrapper):
@@ -107,8 +100,8 @@ class ZMQMultiprocessDataset(DatasetWrapper):
             else:
                 worker = multiprocessing.Process(target=self._worker,
                                                  args=())
-            worker.daemon = True
             worker.start()
+            ensure_subprocess_terminate(worker)
 
     def _worker(self, bind=False):
         context = zmq.Context()
@@ -148,7 +141,7 @@ class ZMQMultiprocessDataset(DatasetWrapper):
         collect_data_socket.connect(self.data_pipename)
 
         # shutdown put_idx_worker and clear queues from previous epoch
-        _shutdown_proc(self.put_idx_worker)
+        shutdown_proc(self.put_idx_worker)
         try:
             while True:
                 collect_data_socket.recv(flags=zmq.NOBLOCK)
@@ -163,8 +156,8 @@ class ZMQMultiprocessDataset(DatasetWrapper):
 
         self.put_idx_worker = multiprocessing.Process(target=self._put_idxs,
                                                       args=())
-        self.put_idx_worker.daemon = True
         self.put_idx_worker.start()
+        ensure_subsubprocess_terminate(self.put_idx_worker)
 
         data_buffer = {}
         for return_idx in self.idxs:
@@ -180,7 +173,7 @@ class ZMQMultiprocessDataset(DatasetWrapper):
                         break
                     else:
                         data_buffer[idx] = dp
-        _shutdown_proc(self.put_idx_worker)
+        shutdown_proc(self.put_idx_worker)
 
 
 def _get_pipe_name(name):

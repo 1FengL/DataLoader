@@ -1,3 +1,4 @@
+import argparse
 import tensorflow as tf
 from torch.utils.data import DataLoader as torchDataloader
 
@@ -81,4 +82,12 @@ class myTransform(Transform):
 
 
 if __name__ == '__main__':
-    measure_dl_speed(dl_choice='tf', num_steps=10, num_worker=4, batch_size=32)
+    parser = argparse.ArgumentParser(description='ILSVRC experiment arguments')
+    parser.add_argument('--batch_size', dest='batch_size', type=int, default=32)
+    parser.add_argument('--num_worker', dest='num_worker', type=int, default=4)
+    parser.add_argument('--num_steps', dest='num_steps', type=int, default=10)
+    parser.add_argument('--dl', dest='dl_choice', type=str, choices=['tf', 'tl', 'torch'])
+
+    args = parser.parse_args()
+
+    measure_dl_speed(dl_choice=args.dl_choice, num_steps=args.num_steps, num_worker=args.num_worker, batch_size=args.batch_size)

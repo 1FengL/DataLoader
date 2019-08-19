@@ -46,7 +46,7 @@ def mnist_preprocessing(img, label):
 
 def test_BatchedDataset():
     ds = SimpleDataset()
-    dl = BatchedDataset(ds, batch_size=2, drop_remainder=True)
+    dl = PrefetchBatchedDataset(ds, batch_size=2, drop_remainder=True)
     assert len(dl) == 2
     for i, batch in enumerate(dl):
         assert len(batch) == 2
@@ -55,7 +55,7 @@ def test_BatchedDataset():
         if i == 1:
             assert batch[0] == 2 and batch[1] == 3
     assert i == 1
-    dl = BatchedDataset(ds, batch_size=2, drop_remainder=False)
+    dl = PrefetchBatchedDataset(ds, batch_size=2, drop_remainder=False)
     assert len(dl) == 3
     for i, batch in enumerate(dl):
         if i == 0:
@@ -67,7 +67,7 @@ def test_BatchedDataset():
     assert i == 2
 
     ds = MNIST(train_or_test='train', path='../data')
-    dl = BatchedDataset(ds, batch_size=500, drop_remainder=True)
+    dl = PrefetchBatchedDataset(ds, batch_size=500, drop_remainder=True)
     assert len(dl) == 120  # 60000 / 500 = 120
     img_shape, label_shape = None, None
     for img, label in dl:

@@ -8,16 +8,142 @@ import zmq
 
 import numpy as np
 
-from dataloader.base import IndexableDatasetWrapper, DatasetWrapper, _Transforms_for_tf_dataset
-from dataloader.parallel import _get_pipe_name, ZMQMultiprocessDataset, MultiprocessDataset
-from dataloader.utils import ensure_proc_terminate
-from dataloader.serialize import convert_to_bytes, load_from_bytes
+from .base import IndexableDatasetWrapper, DatasetWrapper, _Transforms_for_tf_dataset
+from .parallel import _get_pipe_name, ZMQMultiprocessDataset, MultiprocessDataset
+from .utils import ensure_subprocess_terminate
+from .serialize import convert_to_bytes, load_from_bytes
 
-__all__ = ['BatchedDataset', 'TransformedDataset', 'ShuffledDataset',
+__all__ = ['PrefetchBatchedDataset', 'TransformedDataset', 'ShuffledDataset',
            'AugmentedDataset']
 
+#
+# class BatchedDataset(DatasetWrapper):
+#     def __init__(self,
+#                  ds,
+#                  batch_size,
+#                  drop_remainder=True,
+#                  return_numpy=True,
+#                  keep_dims=False,
+#                  output_types=None):
+#         super(BatchedDataset, self).__init__(ds)
+#         self.batch_size = batch_size
+#         self.drop_remainder = drop_remainder
+#         self.return_numpy = return_numpy
+#         self.keep_dims = keep_dims
+#         self.output_types = output_types
+#
+#     def _ZMQ_BatchedDataset_worker(self, ds):
+#         context = zmq.Context()
+#         prepare_data_socket = context.socket(zmq.PUSH)
+#         prepare_data_socket.connect(self.data_pipename)
+#         while True:
+#             dp_buffer = []
+#             for dp in ds:
+#                 dp_buffer.append(dp)
+#                 if len(dp_buffer) == self.batch_size:
+#                     prepare_data_socket.send(convert_to_bytes(self._batch_datapoints(dp_buffer)), copy=False)
+#                     del dp_buffer[:]
+#             if not self.drop_remainder:
+#                 prepare_data_socket.send(convert_to_bytes(self._batch_datapoints(dp_buffer)), copy=False)
+#
+#     def _BatchedDataset_worker(self, ds, pipe):
+#         pipe_output, pipe_input = pipe
+#         # worker process only writes (puts input)
+#         pipe_output.close()
+#         while True:
+#             dp_buffer = []
+#             for dp in ds:
+#                 dp_buffer.append(dp)
+#                 if len(dp_buffer) == self.batch_size:
+#                     pipe_input.send(self._batch_datapoints(dp_buffer))
+#                     del dp_buffer[:]
+#             if not self.drop_remainder:
+#                 pipe_input.send(self._batch_datapoints(dp_buffer))
+#
+#     def __iter__(self):
+#         for _ in range(self.__len__()):
+#             # yield self.q.get()
+#             if self.use_zmq:
+#                 yield load_from_bytes(self.fetch_data_socket.recv(copy=False))
+#             else:
+#                 yield self.pipe_output.recv()
+#
+#     def __len__(self):
+#         ds_len = len(self.ds)
+#         if self.drop_remainder:
+#             return ds_len // self.batch_size
+#         else:
+#             return math.ceil(ds_len / self.batch_size)
+#
+#     @staticmethod
+#     def _batch_datapoints(dp_buffer, return_numpy, output_types):
+#         """
+#
+#         :param dp_buffer: a list of datapoints
+#         :return:
+#         """
+#         first_dp = dp_buffer[0]
+#         if isinstance(first_dp, (tuple, list)):
+#             dp_batch = [None] * len(first_dp)
+#             for i in range(len(first_dp)):
+#                 dp_element_batch = []
+#                 for j in range(len(dp_buffer)):
+#                     dp_element_batch.append(dp_buffer[j][i])
+#                 if return_numpy:
+#                     dp_batch[i] = BatchedDataset._batch_ndarray(dp_element_batch, dtype=BatchedDataset._get_element_dtype(output_types, i))
+#                 else:
+#                     dp_batch[i] = dp_element_batch
+#             return dp_batch
+#         elif isinstance(first_dp, dict):
+#             dp_batch = {}
+#             for key in first_dp.keys():
+#                 dp_element_batch = []
+#                 for j in range(len(dp_buffer)):
+#                     dp_element_batch.append(dp_buffer[j][key])
+#                 if return_numpy:
+#                     dp_batch[key] = BatchedDataset._batch_ndarray(dp_element_batch, dtype=None)
+#                 else:
+#                     dp_batch[key] = dp_element_batch
+#             return dp_batch
+#         elif isinstance(first_dp, np.ndarray):
+#             return self._batch_ndarray(dp_buffer)
+#         # single elements
+#         else:
+#             if self.return_numpy:
+#                 return self._batch_ndarray(dp_buffer, dtype=self._get_element_dtype(0))
+#             else:
+#                 return dp_buffer
+#
+#     @staticmethod
+#     def _batch_ndarray(dp_element_batch, dtype, keep_dims):
+#         """
+#
+#         :param dp_element_batch: a list of datapoint element, an element can be np.ndarray / list
+#         :return: np.ndarray, type is the same as input
+#         """
+#         try:
+#             if dtype is not None:
+#                 ret = np.asarray(dp_element_batch, dtype=dtype)
+#             else:
+#                 ret = np.asarray(dp_element_batch)
+#             if keep_dims and len(ret.shape) == 1:
+#                 ret = np.expand_dims(ret, 1)
+#             return ret
+#         except:
+#             raise ValueError("Unsupported type for batching.")
+#
+#     @staticmethod
+#     def _get_element_dtype(output_types, i):
+#         if output_types is None:
+#             return None
+#         if not isinstance(output_types, (tuple, list)):
+#             return output_types
+#         if len(output_types) == 1:
+#             return output_types[0]
+#         return output_types[i]
 
-class BatchedDataset(DatasetWrapper):
+
+class PrefetchBatchedDataset(DatasetWrapper):
     def __init__(self,
                  ds,
                  batch_size,
@@ -26,19 +152,13 @@ class BatchedDataset(DatasetWrapper):
                  keep_dims=False,
                  output_types=None,
                  use_zmq=True):
-        super(BatchedDataset, self).__init__(ds)
+        super(PrefetchBatchedDataset, self).__init__(ds)
         self.batch_size = batch_size
         self.drop_remainder = drop_remainder
         self.return_numpy = return_numpy
         self.keep_dims = keep_dims
         self.output_types = output_types
         self.use_zmq = use_zmq
-
-        # self.q = multiprocessing.Queue(maxsize=1)
-        # self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
-        #                                       args=(self.ds, self.q))
-        # self.worker.start()
-        # ensure_proc_terminate(self.worker)
 
         if self.use_zmq:
             self.data_pipename = _get_pipe_name('batch_prefetch')
@@ -57,7 +177,7 @@ class BatchedDataset(DatasetWrapper):
             pipe_input.close()
             self.pipe_output = pipe_output
 
-        ensure_proc_terminate(self.worker)
+        ensure_subprocess_terminate(self.worker)
 
     def _ZMQ_BatchedDataset_worker(self, ds):
         context = zmq.Context()
@@ -286,9 +406,9 @@ class Dataloader(DatasetWrapper):
         elif self.shuffle:
             self.ds = ShuffledDataset(self.ds)
 
-        self.ds = BatchedDataset(self.ds, self.batch_size, drop_remainder=self.drop_remainder,
-                                 output_types=self.output_types, keep_dims=self.batch_keep_dims,
-                                 use_zmq=self.use_zmq)
+        self.ds = PrefetchBatchedDataset(self.ds, self.batch_size, drop_remainder=self.drop_remainder,
+                                         output_types=self.output_types, keep_dims=self.batch_keep_dims,
+                                         use_zmq=self.use_zmq)
 
         # self.tfds = tf.data.Dataset.from_generator(self.ds, output_types=output_types)
 
@@ -326,7 +446,7 @@ class TFDataloader(DatasetWrapper):
                  shuffle_buffer_size=None,
                  batch_size=1,
                  drop_remainder=True,
-                 num_worker = tf.data.experimental.AUTOTUNE,
+                 num_worker=tf.data.experimental.AUTOTUNE,
                  # num_extract_worker=os.cpu_count(),
                  # num_map_worker=os.cpu_count(),
                  # num_prefetch=None,

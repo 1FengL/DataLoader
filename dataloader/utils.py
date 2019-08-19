@@ -5,7 +5,7 @@ import multiprocessing
 import os
 import re
 import shutil
-import weakref
+import signal
 
 import psutil
 import tarfile
@@ -214,29 +214,55 @@ def get_process_memory():
     return mi.rss, mi.vms, mi.shared
 
 
-def ensure_proc_terminate(proc):
+def shutdown_proc(proc):
+    if proc is None:
+        return
+    if proc.is_alive():
+        proc.terminate()
+        proc.join()
+
+
+def ensure_subprocess_terminate(proc):
     """
-    Make sure processes terminate when main process exit.
+    Make sure subprocesses terminate when main process exit.
 
     Args:
         proc (multiprocessing.Process or list)
     """
     if isinstance(proc, list):
         for p in proc:
-            ensure_proc_terminate(p)
+            ensure_subprocess_terminate(p)
         return
 
-    def stop_proc_by_weak_ref(ref):
-        proc = ref()
-        if proc is None:
-            return
-        if not proc.is_alive():
-            return
-        proc.terminate()
-        proc.join()
+    assert isinstance(proc, multiprocessing.Process)
+    atexit.register(shutdown_proc, proc)
+
+
+def ensure_subsubprocess_terminate(proc):
+    """
+    Make sure subprocesses of subprocess terminate when main process exit.
+    Subprocesses are terminated when main process exit, and their subprocesses
+    become orphaned and cannot be terminated using atexit module.
+    signal.signal is used to handle this problem.
+
+    Args:
+        proc (multiprocessing.Process or list)
+    """
+
+    class SubsubprocessShutDown():
+        def __init__(self, proc):
+            self.proc = proc
+
+        def __call__(self):
+            shutdown_proc(self.proc)
+
+    if isinstance(proc, list):
+        for p in proc:
+            ensure_subsubprocess_terminate(p)
+        return
 
     assert isinstance(proc, multiprocessing.Process)
-    atexit.register(stop_proc_by_weak_ref, weakref.ref(proc))
+    signal.signal(signal.SIGTERM, SubsubprocessShutDown(proc))
 
 
 def download_file_from_google_drive(ID, destination):
