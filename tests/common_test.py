@@ -1,6 +1,6 @@
 import math
 
-from dataloader.base import Dataset
+from dataloader.base import *
 from dataloader.common import *
 from dataloader.dataset import MNIST
 
@@ -66,7 +66,7 @@ def test_BatchedDataset():
             assert batch[0] == 4
     assert i == 2
 
-    ds = MNIST(train_or_test='train', path='../data')
+    ds = MNIST(train_or_test='train', path='../data', shape=(-1, 28, 28, 1))
     dl = PrefetchBatchedDataset(ds, batch_size=500, drop_remainder=True)
     assert len(dl) == 120  # 60000 / 500 = 120
     img_shape, label_shape = None, None
@@ -95,7 +95,7 @@ def test_TransformedDataset():
     result = [item for item in dl]
     assert set(result) == {999, 1000, 1001, 1002, 1003}
 
-    ds = MNIST(train_or_test='train', path='../data')
+    ds = MNIST(train_or_test='train', path='../data', shape=(-1, 28, 28, 3))
     dl = TransformedDataset(ds, transforms=[mnist_label_power2()])
     for img, label in dl:
         assert label == int(math.sqrt(label)) ** 2

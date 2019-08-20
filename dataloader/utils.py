@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import signal
+import weakref
 
 import psutil
 import tarfile
@@ -222,6 +223,15 @@ def shutdown_proc(proc):
         proc.join()
 
 
+def shutdown_proc_by_weakref(ref):
+    proc = ref()
+    if proc is None:
+        return
+    if proc.is_alive():
+        proc.terminate()
+        proc.join()
+
+
 def ensure_subprocess_terminate(proc):
     """
     Make sure subprocesses terminate when main process exit.
@@ -235,34 +245,50 @@ def ensure_subprocess_terminate(proc):
         return
 
     assert isinstance(proc, multiprocessing.Process)
-    atexit.register(shutdown_proc, proc)
+    atexit.register(shutdown_proc_by_weakref, weakref.ref(proc))
 
 
-def ensure_subsubprocess_terminate(proc):
-    """
-    Make sure subprocesses of subprocess terminate when main process exit.
-    Subprocesses are terminated when main process exit, and their subprocesses
-    become orphaned and cannot be terminated using atexit module.
-    signal.signal is used to handle this problem.
+# def ensure_subsubprocess_terminate(proc):
+#     """
+#     Make sure subprocesses of subprocess terminate when main process exit.
+#     Subprocesses are terminated when main process exit, and their subprocesses
+#     become orphaned and cannot be terminated using atexit module.
+#     signal.signal is used to handle this problem.
+#
+#     Args:
+#         proc (multiprocessing.Process or list)
+#     """
+#
+#     class SubsubprocessShutDown():
+#         def __init__(self, ref):
+#             self.ref = ref
+#
+#         def __call__(self):
+#             shutdown_proc_by_weakref(self.ref)
+#
+#     if isinstance(proc, list):
+#         for p in proc:
+#             ensure_subsubprocess_terminate(p)
+#         return
+#
+#     assert isinstance(proc, multiprocessing.Process)
+#     signal.signal(signal.SIGKILL, SubsubprocessShutDown(weakref.ref(proc)))
 
-    Args:
-        proc (multiprocessing.Process or list)
-    """
-
-    class SubsubprocessShutDown():
-        def __init__(self, proc):
-            self.proc = proc
-
-        def __call__(self):
-            shutdown_proc(self.proc)
-
-    if isinstance(proc, list):
-        for p in proc:
-            ensure_subsubprocess_terminate(p)
+def clean_up_socket_files(pipe_names):
+    if isinstance(pipe_names, list):
+        for pipe_name in pipe_names:
+            clean_up_socket_files(pipe_name)
         return
 
-    assert isinstance(proc, multiprocessing.Process)
-    signal.signal(signal.SIGTERM, SubsubprocessShutDown(proc))
+    def remove_socket_files(pipe_name):
+        # remove all ipc socket files
+        # the environment variable starts with 'ipc://', so file name starts from 6
+        try:
+            os.remove(pipe_name[6:])
+        except (FileNotFoundError, KeyError):
+            pass
+
+    atexit.register(remove_socket_files, pipe_names)
 
 
 def download_file_from_google_drive(ID, destination):

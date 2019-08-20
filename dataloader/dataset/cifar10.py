@@ -179,7 +179,7 @@ class CIFAR10(Dataset):
             self.images = test_data_dic['data']
             self.labels = np.array(test_data_dic['labels'])
 
-        self.images = self.images.reshape(shape=shape)
+        self.images = np.reshape(self.images, shape)
 
     def __getitem__(self, index):
         img = np.array(self.images[index], dtype=np.float32)
