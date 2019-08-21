@@ -141,6 +141,7 @@ class PrefetchBatchedDataset(DatasetWrapper):
                                                   args=(self.ds,))
             self.worker.daemon = True
             self.worker.start()
+            clean_up_socket_files(self.data_pipename)
         else:
             pipe_output, pipe_input = multiprocessing.Pipe()
             self.worker = multiprocessing.Process(target=self._BatchedDataset_worker,
@@ -150,8 +151,6 @@ class PrefetchBatchedDataset(DatasetWrapper):
             # main process only reads (gets output)
             pipe_input.close()
             self.pipe_output = pipe_output
-
-        clean_up_socket_files(self.data_pipename)
 
     def _ZMQ_BatchedDataset_worker(self, ds):
         context = zmq.Context()
