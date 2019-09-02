@@ -222,15 +222,15 @@ def get_peak_memory_usage():
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
     # If we are on linux
-    if platform == "linux" or platform == "linux2":
+    if platform.system()== "linux" or platform.system() == "linux2":
         return format_bytes(rss * 1024)
 
     # If we are on Mac OS X
-    elif platform == "darwin":
+    elif platform.system() == "darwin":
         return format_bytes(rss)
 
     # We don't support Windows
-    elif platform == "win32":
+    elif platform.system() == "win32":
         raise EnvironmentError("The Windows operating system is not supported")
 
     # Unrecognized platform
