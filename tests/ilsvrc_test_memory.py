@@ -1,4 +1,5 @@
 import argparse
+import psutil
 import tensorflow as tf
 import torch
 from torch.utils.data import DataLoader as torchDataloader
@@ -43,6 +44,13 @@ def measure_dl_speed(dl_choice, num_steps, batch_size, num_worker, prepro, zmq, 
 
     cnt = 0
     loading_time_sum, training_time_sum = 0, 0
+    rss_sum, vms_sum, shared_sum = 0, 0, 0
+    rss_before, vms_before, shared_before = get_process_memory()
+    loading_time_start = time.time()
+
+    process = psutil.Process(os.getpid())
+    start_memo = process.memory_info().rss
+    print(start_memo)  # in bytes
 
     warm_up_cnt = 0
     loading_time_start = time.time()
@@ -52,6 +60,11 @@ def measure_dl_speed(dl_choice, num_steps, batch_size, num_worker, prepro, zmq, 
         else:
             loading_time_end = time.time()
             loading_time_sum += loading_time_end - loading_time_start
+
+            rss_after, vms_after, shared_after = get_process_memory()
+            rss_sum += rss_after - rss_before
+            vms_sum += vms_after - vms_before
+            shared_sum += shared_after - shared_before
 
         if dl_choice == 'torch':
             img = img.numpy()
@@ -73,6 +86,8 @@ def measure_dl_speed(dl_choice, num_steps, batch_size, num_worker, prepro, zmq, 
             training_time_sum += training_time_end - training_time_start
             print("Loss: ", loss, " | Loading: ", loading_time_end - loading_time_start, " | Training: ",
                   training_time_end - training_time_start)
+            process = psutil.Process(os.getpid())
+            print(process.memory_info().rss - start_memo)  # in bytes
             cnt += 1
             if cnt == num_steps:
                 break
@@ -81,6 +96,9 @@ def measure_dl_speed(dl_choice, num_steps, batch_size, num_worker, prepro, zmq, 
     print("Config -- dataloader choice: ", dl_choice, " | batch size: ", batch_size, " | num of worker: ", num_worker,
           " | preprocessing: ", prepro)
     print("Average loading: ", loading_time_sum / num_steps, " | Average training: ", training_time_sum / num_steps)
+    print("Average RSS: ", format_bytes(rss_sum / num_steps), " | Average VMS: ",
+          format_bytes(vms_sum / num_steps),
+          " | Average SHR: ", format_bytes(shared_sum / num_steps))
 
 
 class myTransform(Transform):

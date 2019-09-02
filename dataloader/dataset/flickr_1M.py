@@ -117,13 +117,13 @@ def load_flickr1M_dataset(tag='sky', size=10, path="data", n_threads=50, printab
     return images
 
 
-class Flickr1M(Dataset):
-
-    def __init__(self):
-        pass
-
-    def __getitem__(self, index):
-        pass
-
-    def __len__(self):
-        pass
+# class Flickr1M(Dataset):
+#
+#     def __init__(self):
+#         pass
+#
+#     def __getitem__(self, index):
+#         pass
+#
+#     def __len__(self):
+#         pass

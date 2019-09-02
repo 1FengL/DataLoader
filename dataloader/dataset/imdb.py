@@ -10,7 +10,7 @@ import six.moves.cPickle as pickle
 from ..base import Dataset
 from ..utils import maybe_download_and_extract
 
-__all__ = ['load_imdb_dataset']
+__all__ = ['load_imdb_dataset', 'IMDB']
 
 IMDB_BASE_URL = 'https://s3.amazonaws.com/text-datasets/'
 IMDB_FILENAME = 'imdb.pkl'

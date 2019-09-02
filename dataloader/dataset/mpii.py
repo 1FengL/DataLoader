@@ -8,7 +8,7 @@ from tensorlayer import logging
 from ..base import Dataset
 from ..utils import del_file, folder_exists, load_file_list, maybe_download_and_extract
 
-__all__ = ['load_mpii_pose_dataset']
+__all__ = ['load_mpii_pose_dataset', 'MPII']
 
 MPII_BASE_URL = "http://datasets.d2.mpi-inf.mpg.de/andriluka14cvpr/"
 

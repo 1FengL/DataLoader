@@ -8,7 +8,7 @@ from tensorlayer import logging
 from ..base import Dataset
 from ..utils import maybe_download_and_extract
 
-__all__ = ['load_nietzsche_dataset']
+__all__ = ['load_nietzsche_dataset', 'NIETZSCHE']
 
 NIETZSCHE_BASE_URL = 'https://s3.amazonaws.com/text-datasets/'
 NIETZSCHE_FILENAME = 'nietzsche.txt'

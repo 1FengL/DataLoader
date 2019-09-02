@@ -4,14 +4,11 @@
 import os
 
 from tensorlayer import logging, visualize
-from ..utils import (
+from tensorlayer.files.utils import (
     del_file, folder_exists, load_file_list, maybe_download_and_extract, natural_keys, read_file
 )
 
 __all__ = ['load_flickr25k_dataset']
-
-FLICKR25K_URL = 'http://press.liacs.nl/mirflickr/mirflickr25k/mirflickr25k.zip'
-# FLICKR25K_URL = 'http://press.liacs.nl/mirflickr/mirflickr25k.v3/mirflickr25k.zip'
 
 
 def load_flickr25k_dataset(tag='sky', path="data", n_threads=50, printable=False):
@@ -49,11 +46,12 @@ def load_flickr25k_dataset(tag='sky', path="data", n_threads=50, printable=False
     path = os.path.join(path, 'flickr25k')
 
     filename = 'mirflickr25k.zip'
+    url = 'http://press.liacs.nl/mirflickr/mirflickr25k/'
 
     # download dataset
     if folder_exists(os.path.join(path, "mirflickr")) is False:
         logging.info("[*] Flickr25k is nonexistent in {}".format(path))
-        maybe_download_and_extract(filename, path, FLICKR25K_URL, extract=True)
+        maybe_download_and_extract(filename, path, url, extract=True)
         del_file(os.path.join(path, filename))
 
     # return images by the given tag.

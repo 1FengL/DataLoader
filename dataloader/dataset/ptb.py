@@ -9,7 +9,7 @@ import numpy as np
 from ..base import Dataset
 from ..utils import maybe_download_and_extract
 
-__all__ = ['load_ptb_dataset']
+__all__ = ['load_ptb_dataset', 'PTB']
 
 PTB_URL = 'http://www.fit.vutbr.cz/~imikolov/rnnlm/'
 PTB_FILENAME = 'simple-examples.tgz'

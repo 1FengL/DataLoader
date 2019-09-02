@@ -12,7 +12,7 @@ import numpy as np
 from ..base import Dataset
 from ..utils import download_file_from_google_drive, exists_or_mkdir, load_file_list
 
-__all__ = ['load_celebA_dataset']
+__all__ = ['load_celebA_dataset', 'CelebAFiles', 'CelebA']
 
 
 def load_celebA_dataset(name='celebA', path='raw_data'):

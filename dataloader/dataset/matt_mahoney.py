@@ -9,7 +9,7 @@ from tensorlayer import logging
 from ..base import Dataset
 from ..utils import maybe_download_and_extract
 
-__all__ = ['load_matt_mahoney_text8_dataset']
+__all__ = ['load_matt_mahoney_text8_dataset', 'MattMahoney']
 
 MATT_MAHONEY_BASE_URL = 'http://mattmahoney.net/dc/'
 MATT_MAHONEY_FILENAME = 'text8.zip'
@@ -38,7 +38,7 @@ def load_matt_mahoney_text8_dataset(name='mm_test8', path='raw_data'):
 
     Examples
     --------
-    >>> words = tl.files.load_matt_mahoney_text8_dataset()
+    >>> words = load_matt_mahoney_text8_dataset()
     >>> print('Data size', len(words))
 
     """
@@ -47,7 +47,7 @@ def load_matt_mahoney_text8_dataset(name='mm_test8', path='raw_data'):
 
     maybe_download_and_extract(MATT_MAHONEY_FILENAME, path, MATT_MAHONEY_BASE_URL, expected_bytes=31344016)
 
-    with zipfile.ZipFile(os.path.join(path, filename)) as f:
+    with zipfile.ZipFile(os.path.join(path, MATT_MAHONEY_FILENAME)) as f:
         word_list = f.read(f.namelist()[0]).split()
         for idx, _ in enumerate(word_list):
             word_list[idx] = word_list[idx].decode()
@@ -67,7 +67,7 @@ class MattMahoney(Dataset):
     """
 
     def __init__(self, name='mm_test8', path='raw_data'):
-        self.word_list = load_matt_mahoney_text8_dataset(path, name)
+        self.word_list = load_matt_mahoney_text8_dataset(path=path, name=name)
 
     def __getitem__(self, index):
         return self.word_list[index]

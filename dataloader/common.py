@@ -23,7 +23,6 @@ class BatchedDataset(DatasetWrapper):
                  batch_size,
                  drop_remainder=True,
                  return_numpy=True,
-                 keep_dims=False,
                  output_types=None):
         super(BatchedDataset, self).__init__(ds)
         self.batch_size = batch_size
@@ -136,6 +135,7 @@ class PrefetchBatchedDataset(DatasetWrapper):
             self.data_pipename = _get_pipe_name('batch_prefetch')
             context = zmq.Context()
             self.fetch_data_socket = context.socket(zmq.PULL)
+            self.fetch_data_socket.set_hwm(1)
             self.fetch_data_socket.bind(self.data_pipename)
             self.worker = multiprocessing.Process(target=self._ZMQ_BatchedDataset_worker,
                                                   args=(self.ds,))
@@ -155,6 +155,7 @@ class PrefetchBatchedDataset(DatasetWrapper):
     def _ZMQ_BatchedDataset_worker(self, ds):
         context = zmq.Context()
         prepare_data_socket = context.socket(zmq.PUSH)
+        prepare_data_socket.set_hwm(1)
         prepare_data_socket.connect(self.data_pipename)
         while True:
             dp_buffer = []
