@@ -3,7 +3,9 @@ import logging
 import math
 import multiprocessing
 import os
+import platform
 import re
+import resource
 import shutil
 import signal
 import weakref
@@ -213,6 +215,27 @@ def get_process_memory():
     process = psutil.Process(os.getpid())
     mi = process.memory_info()
     return mi.rss, mi.vms, mi.shared
+
+
+def get_peak_memory_usage():
+    # peak memory usage (bytes on OS X, kilobytes on Linux)
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
+    # If we are on linux
+    if platform == "linux" or platform == "linux2":
+        return format_bytes(rss * 1024)
+
+    # If we are on Mac OS X
+    elif platform == "darwin":
+        return format_bytes(rss)
+
+    # We don't support Windows
+    elif platform == "win32":
+        raise EnvironmentError("The Windows operating system is not supported")
+
+    # Unrecognized platform
+    else:
+        raise EnvironmentError("Unrecognized platform")
 
 
 def shutdown_proc(proc):
